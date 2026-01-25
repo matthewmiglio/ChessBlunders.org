@@ -1,11 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { Chess } from "chess.js";
 import { Blunder } from "@/lib/supabase";
 
+// Force dynamic rendering
+export const dynamic = "force-dynamic";
+export const maxDuration = 300; // 5 minutes max
+
 const LAMBDA_URL = "https://0y0qc8c0hk.execute-api.us-east-1.amazonaws.com/prod/analyze";
 const ANALYSIS_DEPTH = 18;
-
 const CONCURRENCY_LIMIT = 5;
 
 export async function POST() {
@@ -14,6 +17,26 @@ export async function POST() {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Check for existing running job
+  const { data: existingJob } = await supabase
+    .from("analysis_jobs")
+    .select("*")
+    .eq("user_id", user.id)
+    .in("status", ["pending", "running"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (existingJob) {
+    return NextResponse.json({
+      jobId: existingJob.id,
+      status: existingJob.status,
+      current: existingJob.analyzed_games,
+      total: existingJob.total_games,
+      message: "Analysis already in progress",
+    });
   }
 
   // Get all games using pagination (Supabase default limit is 1000)
@@ -62,21 +85,39 @@ export async function POST() {
     return NextResponse.json({ message: "All games already analyzed" });
   }
 
-  // Stream progress updates
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream({
-    async start(controller) {
-      let analyzed = 0;
-      const total = unanalyzedGames.length;
+  // Create job record
+  const { data: job, error: jobError } = await supabase
+    .from("analysis_jobs")
+    .insert({
+      user_id: user.id,
+      status: "running",
+      total_games: unanalyzedGames.length,
+      analyzed_games: 0,
+      failed_games: 0,
+    })
+    .select()
+    .single();
 
+  if (jobError || !job) {
+    return NextResponse.json({ error: "Failed to create analysis job" }, { status: 500 });
+  }
+
+  // Run analysis in background after response is sent
+  after(async () => {
+    // Create a fresh supabase client for background work
+    const bgSupabase = await createClient();
+    let analyzed = 0;
+    let failed = 0;
+
+    try {
       // Process games in parallel batches
       for (let i = 0; i < unanalyzedGames.length; i += CONCURRENCY_LIMIT) {
         const batch = unanalyzedGames.slice(i, i + CONCURRENCY_LIMIT);
 
         const results = await Promise.allSettled(
           batch.map(async (game) => {
-            const blunders = await analyzeGame(game.pgn, game.user_color, 100, supabase, user.id);
-            await supabase.from("analysis").insert({
+            const blunders = await analyzeGame(game.pgn, game.user_color, 100, bgSupabase, user.id);
+            await bgSupabase.from("analysis").insert({
               game_id: game.id,
               user_id: user.id,
               blunders: blunders,
@@ -86,39 +127,50 @@ export async function POST() {
           })
         );
 
-        // Count successful analyses
-        const successCount = results.filter(r => r.status === "fulfilled").length;
-        analyzed += successCount;
-
-        // Log failures
-        results.forEach((result, idx) => {
-          if (result.status === "rejected") {
-            console.error(`Failed to analyze game ${batch[idx].id}:`, result.reason);
+        // Count results
+        for (const result of results) {
+          if (result.status === "fulfilled") {
+            analyzed++;
+          } else {
+            failed++;
+            console.error("Failed to analyze game:", result.reason);
           }
-        });
+        }
 
-        // Send progress update after each batch
-        controller.enqueue(
-          encoder.encode(
-            JSON.stringify({ progress: true, current: analyzed, total }) + "\n"
-          )
-        );
+        // Update progress in database
+        await bgSupabase.rpc("update_analysis_job_progress", {
+          p_job_id: job.id,
+          p_analyzed: analyzed,
+          p_failed: failed,
+        });
       }
 
-      controller.enqueue(
-        encoder.encode(
-          JSON.stringify({ done: true, analyzed, total }) + "\n"
-        )
-      );
-      controller.close();
-    },
+      // Mark as completed
+      await bgSupabase
+        .from("analysis_jobs")
+        .update({ status: "completed", completed_at: new Date().toISOString() })
+        .eq("id", job.id);
+
+    } catch (error) {
+      console.error("Background analysis error:", error);
+      await bgSupabase
+        .from("analysis_jobs")
+        .update({
+          status: "failed",
+          error: error instanceof Error ? error.message : "Unknown error",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", job.id);
+    }
   });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-      "Transfer-Encoding": "chunked",
-    },
+  // Return immediately with job info
+  return NextResponse.json({
+    jobId: job.id,
+    status: "running",
+    current: 0,
+    total: unanalyzedGames.length,
+    message: "Analysis started in background",
   });
 }
 
@@ -138,7 +190,9 @@ async function evaluatePosition(fen: string): Promise<{ eval: number; bestMove: 
 
     const line = data.lines[0];
     return {
-      eval: line.score_type === "mate" ? (line.score > 0 ? 10000 : -10000) : line.score,
+      eval: line.score.mate !== undefined
+        ? (line.score.mate > 0 ? 10000 : -10000)
+        : line.score.cp,
       bestMove: line.pv?.[0] || "",
     };
   } catch (error) {

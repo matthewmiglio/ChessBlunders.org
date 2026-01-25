@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useCallback, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Analysis, Blunder } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ function AnalysisContent() {
   const [stats, setStats] = useState({ totalGames: 0, analyzedGames: 0 });
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeProgress, setAnalyzeProgress] = useState({ current: 0, total: 0 });
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -31,7 +32,13 @@ function AnalysisContent() {
     if (user) {
       fetchAnalyses();
       fetchStats();
+      checkJobStatus();
     }
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
   }, [user]);
 
   useEffect(() => {
@@ -65,6 +72,63 @@ function AnalysisContent() {
     }
   };
 
+  const checkJobStatus = useCallback(async () => {
+    try {
+      const response = await fetch("/api/analysis/status");
+      const data = await response.json();
+
+      if (data.hasJob && (data.status === "running" || data.status === "pending")) {
+        setAnalyzing(true);
+        setAnalyzeProgress({ current: data.current, total: data.total });
+        startPolling();
+      } else if (data.hasJob && data.status === "completed") {
+        setAnalyzing(false);
+        setAnalyzeProgress({ current: 0, total: 0 });
+      }
+    } catch (error) {
+      console.error("Error checking job status:", error);
+    }
+  }, []);
+
+  const startPolling = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+    }
+
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        const response = await fetch("/api/analysis/status");
+        const data = await response.json();
+
+        if (data.hasJob) {
+          setAnalyzeProgress({ current: data.current, total: data.total });
+
+          if (data.status === "completed") {
+            setAnalyzing(false);
+            setAnalyzeProgress({ current: 0, total: 0 });
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
+            toast.success(`Analysis complete! ${data.current} games analyzed.`);
+            fetchAnalyses();
+            fetchStats();
+          } else if (data.status === "failed") {
+            setAnalyzing(false);
+            setAnalyzeProgress({ current: 0, total: 0 });
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
+            toast.error(`Analysis failed: ${data.error || "Unknown error"}`);
+          }
+        }
+      } catch (error) {
+        console.error("Error polling job status:", error);
+      }
+    }, 2000);
+  }, []);
+
   const analyzeAll = async () => {
     setAnalyzing(true);
     try {
@@ -72,37 +136,26 @@ function AnalysisContent() {
         method: "POST",
       });
 
+      const data = await response.json();
+
       if (response.ok) {
-        const reader = response.body?.getReader();
-        if (reader) {
-          const decoder = new TextDecoder();
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const text = decoder.decode(value);
-            const lines = text.split("\n").filter(Boolean);
-            for (const line of lines) {
-              try {
-                const data = JSON.parse(line);
-                if (data.progress) {
-                  setAnalyzeProgress({ current: data.current, total: data.total });
-                }
-              } catch {}
-            }
-          }
+        if (data.message === "All games already analyzed") {
+          toast.info("All games are already analyzed!");
+          setAnalyzing(false);
+          return;
         }
-        fetchAnalyses();
-        fetchStats();
+
+        setAnalyzeProgress({ current: data.current || 0, total: data.total || 0 });
+        toast.success("Analysis started! You can close this page - it will continue in the background.");
+        startPolling();
       } else {
-        const data = await response.json();
-        toast.error(data.error || "Failed to analyze games");
+        toast.error(data.error || "Failed to start analysis");
+        setAnalyzing(false);
       }
     } catch (error) {
       console.error("Error analyzing games:", error);
-      toast.error("Failed to analyze games");
-    } finally {
+      toast.error("Failed to start analysis");
       setAnalyzing(false);
-      setAnalyzeProgress({ current: 0, total: 0 });
     }
   };
 
@@ -202,6 +255,24 @@ function AnalysisContent() {
             : "Analyze All Games"}
         </button>
       </div>
+
+      {analyzing && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <p className="text-blue-800">
+            Analysis is running in the background. You can close this page and come back later.
+          </p>
+          <div className="mt-2 bg-blue-200 rounded-full h-2">
+            <div
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{
+                width: analyzeProgress.total > 0
+                  ? `${(analyzeProgress.current / analyzeProgress.total) * 100}%`
+                  : "0%"
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow p-6">
