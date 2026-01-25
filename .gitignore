@@ -1,0 +1,41 @@
+# Claude
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+env/
+venv/
+ENV/
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local Python data and generated files
+local_python/data/
+local_python/poetry.lock
+local_python/config.json
+
+# web_app (Next.js)
+web_app/node_modules/
+web_app/.next/
+web_app/out/
+web_app/build/
+web_app/.vercel
+web_app/.env*
+web_app/*.tsbuildinfo
+web_app/coverage/
+web_app/docs/
