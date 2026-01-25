@@ -162,7 +162,10 @@ function AnalysisContent() {
   if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-gray-600">Loading...</p>
+        <div className="flex items-center gap-3">
+          <div className="w-5 h-5 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+          <p className="text-slate-400">Loading...</p>
+        </div>
       </div>
     );
   }
@@ -172,52 +175,57 @@ function AnalysisContent() {
       <div>
         <button
           onClick={() => setSelectedAnalysis(null)}
-          className="text-blue-600 hover:text-blue-800 mb-4"
+          className="text-sky-400 hover:text-sky-300 mb-6 inline-flex items-center gap-2 text-sm font-medium transition-colors"
         >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
           Back to all analyses
         </button>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+        <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-6 sm:p-8">
+          <h1 className="text-2xl font-semibold tracking-tight text-white mb-6">
             Game Analysis
           </h1>
 
-          <div className="mb-6">
-            <p className="text-gray-600">
-              Analyzed: {new Date(selectedAnalysis.analyzed_at).toLocaleString()}
+          <div className="mb-8 space-y-2">
+            <p className="text-slate-400 text-sm">
+              Analyzed: <span className="text-slate-300">{new Date(selectedAnalysis.analyzed_at).toLocaleString()}</span>
             </p>
-            <p className="text-gray-600">
-              Blunders found: {selectedAnalysis.blunders.length}
+            <p className="text-slate-400 text-sm">
+              Blunders found: <span className="text-sky-400 font-medium">{selectedAnalysis.blunders.length}</span>
             </p>
-            <p className="text-gray-600">
-              Threshold: {selectedAnalysis.threshold_cp} centipawns
+            <p className="text-slate-400 text-sm">
+              Threshold: <span className="text-slate-300">{selectedAnalysis.threshold_cp} centipawns</span>
             </p>
           </div>
 
           {selectedAnalysis.blunders.length === 0 ? (
-            <p className="text-gray-600">
-              No blunders found in this game. Great play!
-            </p>
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-6 text-center">
+              <p className="text-emerald-400">
+                No blunders found in this game. Great play!
+              </p>
+            </div>
           ) : (
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold">Blunders</h2>
+              <h2 className="text-lg font-semibold text-white">Blunders</h2>
               {selectedAnalysis.blunders.map((blunder: Blunder, index: number) => (
                 <div
                   key={index}
-                  className="border border-gray-200 rounded-lg p-4"
+                  className="bg-slate-800/50 border border-white/10 rounded-xl p-5 hover:border-white/20 transition-colors"
                 >
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="font-medium">Move {blunder.move_number}</p>
-                      <p className="text-sm text-gray-600">
-                        Played: <span className="font-mono">{blunder.move_played}</span>
+                      <p className="font-medium text-white">Move {blunder.move_number}</p>
+                      <p className="text-sm text-slate-400 mt-1">
+                        Played: <span className="font-mono text-red-400">{blunder.move_played}</span>
                       </p>
-                      <p className="text-sm text-green-600">
-                        Best: <span className="font-mono">{blunder.best_move}</span>
+                      <p className="text-sm text-slate-400">
+                        Best: <span className="font-mono text-emerald-400">{blunder.best_move}</span>
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-red-600 font-medium">
+                      <p className="text-red-400 font-semibold text-lg">
                         -{blunder.eval_drop} cp
                       </p>
                       <button
@@ -226,7 +234,7 @@ function AnalysisContent() {
                             `/practice?analysisId=${selectedAnalysis.id}&blunderIndex=${index}`
                           )
                         }
-                        className="mt-2 text-sm bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded"
+                        className="mt-3 inline-flex items-center justify-center rounded-lg bg-gradient-to-b from-emerald-400 to-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-emerald-500/25 hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 transition-all"
                       >
                         Practice
                       </button>
@@ -243,27 +251,32 @@ function AnalysisContent() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Analysis</h1>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">Analysis</h1>
         <button
           onClick={analyzeAll}
           disabled={analyzing || stats.totalGames === stats.analyzedGames}
-          className="bg-green-600 hover:bg-green-500 disabled:bg-gray-400 text-white px-4 py-2 rounded font-medium"
+          className="inline-flex items-center justify-center rounded-xl bg-gradient-to-b from-emerald-400 to-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
-          {analyzing
-            ? `Analyzing ${analyzeProgress.current}/${analyzeProgress.total}...`
-            : "Analyze All Games"}
+          {analyzing ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+              Analyzing {analyzeProgress.current}/{analyzeProgress.total}...
+            </>
+          ) : (
+            "Analyze All Games"
+          )}
         </button>
       </div>
 
       {analyzing && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <p className="text-blue-800">
+        <div className="bg-sky-500/10 border border-sky-500/30 rounded-2xl p-5 mb-8">
+          <p className="text-sky-400 text-sm mb-3">
             Analysis is running in the background. You can close this page and come back later.
           </p>
-          <div className="mt-2 bg-blue-200 rounded-full h-2">
+          <div className="bg-sky-950 rounded-full h-2 overflow-hidden">
             <div
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              className="bg-gradient-to-r from-sky-400 to-sky-500 h-2 rounded-full transition-all duration-300"
               style={{
                 width: analyzeProgress.total > 0
                   ? `${(analyzeProgress.current / analyzeProgress.total) * 100}%`
@@ -274,16 +287,16 @@ function AnalysisContent() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-sm text-gray-500 uppercase tracking-wider">Total Games</p>
-          <p className="text-3xl font-bold text-gray-900">{stats.totalGames}</p>
+      <div className="grid grid-cols-2 gap-4 sm:gap-6 mb-8">
+        <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-6">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Total Games</p>
+          <p className="text-3xl font-semibold text-white">{stats.totalGames}</p>
         </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-sm text-gray-500 uppercase tracking-wider">Analyzed</p>
-          <p className="text-3xl font-bold text-green-600">
+        <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-6">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Analyzed</p>
+          <p className="text-3xl font-semibold text-emerald-400">
             {stats.analyzedGames}
-            <span className="text-lg text-gray-400 ml-2">
+            <span className="text-lg text-slate-500 ml-2 font-normal">
               ({stats.totalGames > 0 ? Math.round((stats.analyzedGames / stats.totalGames) * 100) : 0}%)
             </span>
           </p>
@@ -291,9 +304,17 @@ function AnalysisContent() {
       </div>
 
       {analyses.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center">
-          <p className="text-gray-600 mb-4">
-            No games analyzed yet. Click &quot;Analyze All Games&quot; to get started.
+        <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-12 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </div>
+          <p className="text-slate-400 mb-2">
+            No games analyzed yet
+          </p>
+          <p className="text-slate-500 text-sm">
+            Click &quot;Analyze All Games&quot; to get started.
           </p>
         </div>
       ) : (
@@ -301,19 +322,26 @@ function AnalysisContent() {
           {analyses.map((analysis) => (
             <div
               key={analysis.id}
-              className="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition-shadow"
+              className="bg-slate-900/50 border border-white/10 rounded-2xl p-5 cursor-pointer hover:border-white/20 hover:bg-slate-800/50 transition-all"
               onClick={() => setSelectedAnalysis(analysis)}
             >
               <div className="flex justify-between items-center">
                 <div>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-white">
                     {new Date(analysis.analyzed_at).toLocaleDateString()}
                   </p>
-                  <p className="text-sm text-gray-600">
-                    {analysis.blunders.length} blunders found
+                  <p className="text-sm text-slate-400 mt-1">
+                    <span className={analysis.blunders.length > 0 ? "text-amber-400" : "text-emerald-400"}>
+                      {analysis.blunders.length}
+                    </span> blunders found
                   </p>
                 </div>
-                <span className="text-blue-600">View details</span>
+                <span className="text-sky-400 text-sm font-medium inline-flex items-center gap-1">
+                  View details
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </span>
               </div>
             </div>
           ))}
@@ -328,7 +356,10 @@ export default function AnalysisPage() {
     <Suspense
       fallback={
         <div className="flex items-center justify-center min-h-[60vh]">
-          <p className="text-gray-600">Loading...</p>
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+            <p className="text-slate-400">Loading...</p>
+          </div>
         </div>
       }
     >

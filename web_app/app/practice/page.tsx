@@ -1,9 +1,11 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Analysis, Blunder } from "@/lib/supabase";
+import { Chess } from "chess.js";
+import ChessBoard from "@/components/ChessBoard";
 
 interface UserStats {
   total_games: number;
@@ -11,6 +13,26 @@ interface UserStats {
   total_blunders: number;
   solved_blunders: number;
   total_attempts: number;
+}
+
+// Convert SAN move to UCI format using a chess position
+function sanToUci(fen: string, san: string): string | null {
+  try {
+    const game = new Chess(fen);
+    const move = game.move(san);
+    if (move) {
+      return move.from + move.to + (move.promotion || "");
+    }
+  } catch {
+    console.warn("Failed to convert SAN to UCI:", san);
+  }
+  return null;
+}
+
+// Get player side from FEN (whose turn it is)
+function getPlayerSide(fen: string): "w" | "b" {
+  const parts = fen.split(" ");
+  return parts[1] === "b" ? "b" : "w";
 }
 
 function PracticeContent() {
@@ -26,13 +48,15 @@ function PracticeContent() {
     null
   );
   const [currentBlunderIndex, setCurrentBlunderIndex] = useState<number>(0);
-  const [userMove, setUserMove] = useState("");
   const [feedback, setFeedback] = useState<{
     correct: boolean;
     message: string;
+    userMove?: string;
   } | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [expectedMoveUci, setExpectedMoveUci] = useState<string>("");
+  const [showHint, setShowHint] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -58,6 +82,15 @@ function PracticeContent() {
     }
   }, [analysisId, blunderIndexParam, analyses]);
 
+  // Convert best_move to UCI when blunder changes
+  useEffect(() => {
+    if (currentBlunder) {
+      const uci = sanToUci(currentBlunder.fen, currentBlunder.best_move);
+      setExpectedMoveUci(uci || "");
+      setShowHint(false);
+    }
+  }, [currentBlunder]);
+
   const fetchData = async () => {
     try {
       const [analysesRes, userRes] = await Promise.all([
@@ -82,7 +115,7 @@ function PracticeContent() {
     }
   };
 
-  const pickRandomBlunder = (availableAnalyses: Analysis[]) => {
+  const pickRandomBlunder = useCallback((availableAnalyses: Analysis[]) => {
     const analysesWithBlunders = availableAnalyses.filter(
       (a) => a.blunders.length > 0
     );
@@ -100,21 +133,18 @@ function PracticeContent() {
     setCurrentBlunderIndex(randomIndex);
     setCurrentBlunder(randomAnalysis.blunders[randomIndex]);
     setFeedback(null);
-    setUserMove("");
-  };
+    setShowHint(false);
+  }, []);
 
-  const checkMove = async () => {
+  const handleMoveResult = async (correct: boolean, userMoveUci: string) => {
     if (!currentBlunder || !currentAnalysisId) return;
 
-    const isCorrect =
-      userMove.toLowerCase().replace(/\s/g, "") ===
-      currentBlunder.best_move.toLowerCase().replace(/\s/g, "");
-
     setFeedback({
-      correct: isCorrect,
-      message: isCorrect
+      correct,
+      message: correct
         ? "Correct! That's the best move."
         : `Incorrect. The best move was ${currentBlunder.best_move}`,
+      userMove: userMoveUci,
     });
 
     // Record attempt
@@ -125,7 +155,7 @@ function PracticeContent() {
         body: JSON.stringify({
           analysisId: currentAnalysisId,
           blunderIndex: currentBlunderIndex,
-          solved: isCorrect,
+          solved: correct,
         }),
       });
 
@@ -142,10 +172,17 @@ function PracticeContent() {
     pickRandomBlunder(analyses);
   };
 
+  const handleShowHint = () => {
+    setShowHint(true);
+  };
+
   if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-gray-600">Loading...</p>
+        <div className="flex items-center gap-3">
+          <div className="w-5 h-5 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+          <p className="text-slate-400">Loading...</p>
+        </div>
       </div>
     );
   }
@@ -154,16 +191,32 @@ function PracticeContent() {
 
   if (analysesWithBlunders.length === 0) {
     return (
-      <div className="text-center py-12">
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">
+      <div className="text-center py-16">
+        <div className="w-20 h-20 rounded-2xl bg-slate-800 flex items-center justify-center mx-auto mb-6">
+          <svg
+            className="w-10 h-10 text-slate-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+            />
+          </svg>
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white mb-4">
           Practice Mode
         </h1>
-        <p className="text-gray-600 mb-6">
-          No blunders to practice yet. Analyze some games first!
+        <p className="text-slate-400 mb-8 max-w-md mx-auto">
+          No blunders to practice yet. Analyze some games first to find
+          positions to train on.
         </p>
         <button
           onClick={() => router.push("/games")}
-          className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-lg font-medium"
+          className="inline-flex items-center justify-center rounded-xl bg-gradient-to-b from-sky-400 to-sky-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/25 hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 transition-all"
         >
           Go to Games
         </button>
@@ -171,32 +224,43 @@ function PracticeContent() {
     );
   }
 
+  const playerSide = currentBlunder ? getPlayerSide(currentBlunder.fen) : "w";
+  const hintSquare = showHint && expectedMoveUci ? expectedMoveUci.slice(2, 4) : null;
+
   return (
-    <div className="max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Practice Mode</h1>
+    <div className="max-w-6xl mx-auto">
+      <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white mb-8">
+        Practice Mode
+      </h1>
 
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-lg shadow p-4 text-center">
-            <p className="text-2xl font-bold text-gray-900">
+          <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-5 text-center">
+            <p className="text-2xl font-semibold text-white">
               {stats.total_blunders}
             </p>
-            <p className="text-sm text-gray-600">Total Blunders</p>
+            <p className="text-xs text-slate-400 uppercase tracking-wider mt-1">
+              Total Blunders
+            </p>
           </div>
-          <div className="bg-white rounded-lg shadow p-4 text-center">
-            <p className="text-2xl font-bold text-green-600">
+          <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-5 text-center">
+            <p className="text-2xl font-semibold text-emerald-400">
               {stats.solved_blunders}
             </p>
-            <p className="text-sm text-gray-600">Solved</p>
+            <p className="text-xs text-slate-400 uppercase tracking-wider mt-1">
+              Solved
+            </p>
           </div>
-          <div className="bg-white rounded-lg shadow p-4 text-center">
-            <p className="text-2xl font-bold text-gray-900">
+          <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-5 text-center">
+            <p className="text-2xl font-semibold text-white">
               {stats.total_attempts}
             </p>
-            <p className="text-sm text-gray-600">Total Attempts</p>
+            <p className="text-xs text-slate-400 uppercase tracking-wider mt-1">
+              Total Attempts
+            </p>
           </div>
-          <div className="bg-white rounded-lg shadow p-4 text-center">
-            <p className="text-2xl font-bold text-blue-600">
+          <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-5 text-center">
+            <p className="text-2xl font-semibold text-sky-400">
               {stats.total_attempts > 0
                 ? Math.round(
                     (stats.solved_blunders / stats.total_attempts) * 100
@@ -204,73 +268,143 @@ function PracticeContent() {
                 : 0}
               %
             </p>
-            <p className="text-sm text-gray-600">Success Rate</p>
+            <p className="text-xs text-slate-400 uppercase tracking-wider mt-1">
+              Success Rate
+            </p>
           </div>
         </div>
       )}
 
       {currentBlunder && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold mb-2">
-              Find the best move
-            </h2>
-            <p className="text-gray-600">
-              You played <span className="font-mono">{currentBlunder.move_played}</span> in
-              this position. What should you have played instead?
-            </p>
-          </div>
-
-          <div className="mb-6 p-4 bg-gray-100 rounded-lg">
-            <p className="font-mono text-sm break-all">{currentBlunder.fen}</p>
-          </div>
-
-          <div className="mb-6">
-            <p className="text-sm text-gray-600 mb-2">
-              Evaluation dropped from {currentBlunder.eval_before} to{" "}
-              {currentBlunder.eval_after} (lost {currentBlunder.eval_drop} cp)
-            </p>
-          </div>
-
-          {!feedback && (
-            <div className="flex gap-4">
-              <input
-                type="text"
-                value={userMove}
-                onChange={(e) => setUserMove(e.target.value)}
-                placeholder="Enter your move (e.g., Nf3)"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded"
-                onKeyDown={(e) => e.key === "Enter" && checkMove()}
-              />
-              <button
-                onClick={checkMove}
-                disabled={!userMove.trim()}
-                className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-400 text-white px-6 py-2 rounded font-medium"
-              >
-                Check
-              </button>
-            </div>
-          )}
-
-          {feedback && (
-            <div className="space-y-4">
-              <div
-                className={`p-4 rounded-lg ${
-                  feedback.correct
-                    ? "bg-green-100 text-green-800"
-                    : "bg-red-100 text-red-800"
-                }`}
-              >
-                {feedback.message}
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Left: Chess Board */}
+          <div className="flex-1 lg:max-w-[60%]">
+            <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-6">
+              <div className="text-center mb-4">
+                <h2 className="text-xl font-semibold text-white">
+                  {playerSide === "w" ? "White" : "Black"} to move
+                </h2>
+                <p className="text-slate-400 text-sm mt-1">
+                  Find the best move
+                </p>
               </div>
-              <button
-                onClick={nextBlunder}
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-medium"
-              >
-                Next Blunder
-              </button>
+
+              <ChessBoard
+                fen={currentBlunder.fen}
+                expectedMove={expectedMoveUci}
+                onMoveResult={handleMoveResult}
+                playerSide={playerSide}
+                isActive={!feedback}
+                highlightSquare={hintSquare}
+              />
             </div>
-          )}
+          </div>
+
+          {/* Right: Info Panel */}
+          <div className="flex-1 lg:max-w-[40%]">
+            <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-6 space-y-6">
+              {/* Blunder Info */}
+              <div>
+                <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider mb-3">
+                  Position Info
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-slate-400">You played</span>
+                    <span className="font-mono text-red-400">
+                      {currentBlunder.move_played}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-slate-400">Eval before</span>
+                    <span className="font-mono text-slate-300">
+                      {currentBlunder.eval_before > 0 ? "+" : ""}
+                      {(currentBlunder.eval_before / 100).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-slate-400">Eval after</span>
+                    <span className="font-mono text-red-400">
+                      {currentBlunder.eval_after > 0 ? "+" : ""}
+                      {(currentBlunder.eval_after / 100).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-slate-400">Eval drop</span>
+                    <span className="font-mono text-red-400">
+                      -{currentBlunder.eval_drop} cp
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Hint Button */}
+              {!feedback && !showHint && (
+                <button
+                  onClick={handleShowHint}
+                  className="w-full py-3 px-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors text-sm font-medium"
+                >
+                  Show Hint
+                </button>
+              )}
+
+              {/* Feedback */}
+              {feedback && (
+                <div className="space-y-4">
+                  <div
+                    className={`p-5 rounded-xl ${
+                      feedback.correct
+                        ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"
+                        : "bg-red-500/10 border border-red-500/30 text-red-400"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      {feedback.correct ? (
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      ) : (
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      )}
+                      <span className="font-semibold">
+                        {feedback.correct ? "Correct!" : "Incorrect"}
+                      </span>
+                    </div>
+                    <p className="text-sm opacity-90">{feedback.message}</p>
+                  </div>
+
+                  <button
+                    onClick={nextBlunder}
+                    className="w-full inline-flex items-center justify-center rounded-xl bg-gradient-to-b from-violet-400 to-violet-500 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/25 hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 transition-all"
+                  >
+                    Next Blunder
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -282,7 +416,10 @@ export default function PracticePage() {
     <Suspense
       fallback={
         <div className="flex items-center justify-center min-h-[60vh]">
-          <p className="text-gray-600">Loading...</p>
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+            <p className="text-slate-400">Loading...</p>
+          </div>
         </div>
       }
     >

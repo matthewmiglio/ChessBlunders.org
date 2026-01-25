@@ -85,32 +85,35 @@ function SignInContent() {
   };
 
   return (
-    <div className="min-h-[60vh] flex items-center justify-center">
-      <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full mx-4">
-        <h1 className="text-2xl font-bold text-gray-900 text-center mb-2">
-          {isSignUp ? "Create an Account" : "Sign in to ChessBlunders.org"}
+    <div className="min-h-[60vh] flex items-center justify-center relative">
+      {/* Background glow */}
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.1),transparent_50%)]" />
+
+      <div className="bg-slate-900/70 backdrop-blur-sm border border-white/10 rounded-2xl p-8 max-w-md w-full mx-4 shadow-xl">
+        <h1 className="text-2xl font-semibold tracking-tight text-white text-center mb-2">
+          {isSignUp ? "Create an Account" : "Welcome Back"}
         </h1>
-        <p className="text-gray-600 text-center mb-6">
+        <p className="text-slate-400 text-center mb-8 text-sm">
           {isSignUp
             ? "Create an account to start training"
-            : "Welcome back! Sign in to continue"}
+            : "Sign in to continue your training"}
         </p>
 
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 text-sm">
+          <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl mb-6 text-sm">
             {error}
           </div>
         )}
 
         {message && (
-          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 text-sm">
+          <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-4 py-3 rounded-xl mb-6 text-sm">
             {message}
           </div>
         )}
 
-        <form onSubmit={isSignUp ? handleSignUp : handleSignIn} className="space-y-4">
+        <form onSubmit={isSignUp ? handleSignUp : handleSignIn} className="space-y-5">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-2">
               Email
             </label>
             <input
@@ -120,13 +123,13 @@ function SignInContent() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
-              className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-slate-800/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition-all"
               placeholder="you@example.com"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-2">
               Password
             </label>
             <input
@@ -136,11 +139,11 @@ function SignInContent() {
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete={isSignUp ? "new-password" : "current-password"}
-              className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-slate-800/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition-all"
               placeholder="Your password"
             />
             {isSignUp && (
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-slate-500 mt-2">
                 At least 8 characters with uppercase, lowercase, and a number
               </p>
             )}
@@ -148,7 +151,7 @@ function SignInContent() {
 
           {isSignUp && (
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-300 mb-2">
                 Confirm Password
               </label>
               <input
@@ -158,7 +161,7 @@ function SignInContent() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 autoComplete="new-password"
-                className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2.5 bg-slate-800/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition-all"
                 placeholder="Confirm your password"
               />
             </div>
@@ -167,7 +170,7 @@ function SignInContent() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-gray-400 text-white py-2 rounded font-medium transition-colors"
+            className="w-full inline-flex items-center justify-center rounded-xl bg-gradient-to-b from-sky-400 to-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/25 hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             {loading
               ? "Please wait..."
@@ -184,7 +187,7 @@ function SignInContent() {
               setError("");
               setMessage("");
             }}
-            className="text-blue-600 hover:text-blue-800 text-sm"
+            className="text-sky-400 hover:text-sky-300 text-sm transition-colors"
           >
             {isSignUp
               ? "Already have an account? Sign in"
@@ -195,7 +198,7 @@ function SignInContent() {
         <div className="mt-4">
           <Link
             href="/"
-            className="block w-full text-center text-gray-600 hover:text-gray-800 text-sm"
+            className="block w-full text-center text-slate-500 hover:text-slate-300 text-sm transition-colors"
           >
             Back to home
           </Link>
@@ -210,7 +213,10 @@ export default function SignInPage() {
     <Suspense
       fallback={
         <div className="min-h-[60vh] flex items-center justify-center">
-          <p className="text-gray-600">Loading...</p>
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+            <p className="text-slate-400">Loading...</p>
+          </div>
         </div>
       }
     >
