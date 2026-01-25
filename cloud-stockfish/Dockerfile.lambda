@@ -1,0 +1,21 @@
+FROM public.ecr.aws/lambda/python:3.11
+
+# Install build tools and compile Stockfish from source for compatibility
+RUN yum install -y git gcc-c++ make && \
+    git clone --depth 1 --branch sf_16.1 https://github.com/official-stockfish/Stockfish.git && \
+    cd Stockfish/src && \
+    make -j$(nproc) build ARCH=x86-64 && \
+    mv stockfish /usr/local/bin/stockfish && \
+    chmod +x /usr/local/bin/stockfish && \
+    cd / && rm -rf Stockfish && \
+    yum remove -y git gcc-c++ make && \
+    yum clean all
+
+# Install Python dependencies (none needed for Lambda handler)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy handler
+COPY lambda_handler.py .
+
+CMD ["lambda_handler.handler"]
