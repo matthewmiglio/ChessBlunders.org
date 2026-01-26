@@ -70,7 +70,7 @@ export function GamesTable({ games }: GamesTableProps) {
               <td className="px-6 py-4 whitespace-nowrap text-sm">
                 <span className={`font-medium ${
                   game.result === "win" ? "text-[#18be5d]" :
-                  game.result === "loss" ? "text-[#f44336]" :
+                  ["resigned", "checkmated", "timeout", "abandoned", "loss"].includes(game.result || "") ? "text-[#f44336]" :
                   "text-[#b4b4b4]"
                 }`}>
                   {game.result}
