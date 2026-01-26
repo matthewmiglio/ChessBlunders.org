@@ -146,8 +146,12 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 }
 
 async function handleInvoicePaid(invoice: InvoiceWithSubscription) {
+  console.log('[stripe-webhook] handleInvoicePaid called');
   const subscriptionId = invoice.subscription;
-  if (!subscriptionId) return;
+  if (!subscriptionId) {
+    console.log('[stripe-webhook] No subscription ID in invoice, skipping');
+    return;
+  }
 
   const subscription = await stripe.subscriptions.retrieve(subscriptionId) as unknown as SubscriptionWithPeriod;
   const userId = subscription.metadata.supabase_user_id;
@@ -157,7 +161,7 @@ async function handleInvoicePaid(invoice: InvoiceWithSubscription) {
     return;
   }
 
-  await supabaseAdmin
+  const { error } = await supabaseAdmin
     .from('profiles')
     .update({
       stripe_subscription_status: 'active',
@@ -166,33 +170,66 @@ async function handleInvoicePaid(invoice: InvoiceWithSubscription) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', userId);
+
+  if (error) {
+    console.error('[stripe-webhook] Failed to update profile for invoice.paid:', error);
+    throw error;
+  } else {
+    console.log('[stripe-webhook] Invoice paid processed for user:', userId);
+  }
 }
 
 async function handlePaymentFailed(invoice: InvoiceWithSubscription) {
+  console.log('[stripe-webhook] handlePaymentFailed called');
   const subscriptionId = invoice.subscription;
-  if (!subscriptionId) return;
+  if (!subscriptionId) {
+    console.log('[stripe-webhook] No subscription ID in invoice, skipping');
+    return;
+  }
 
   const subscription = await stripe.subscriptions.retrieve(subscriptionId) as unknown as SubscriptionWithPeriod;
   const userId = subscription.metadata.supabase_user_id;
 
-  await supabaseAdmin
+  if (!userId) {
+    console.error('[stripe-webhook] No supabase_user_id in subscription metadata for payment.failed');
+    return;
+  }
+
+  const { error } = await supabaseAdmin
     .from('profiles')
     .update({
       stripe_subscription_status: subscription.status,
       updated_at: new Date().toISOString(),
     })
     .eq('id', userId);
+
+  if (error) {
+    console.error('[stripe-webhook] Failed to update profile for payment.failed:', error);
+    throw error;
+  } else {
+    console.log('[stripe-webhook] Payment failed processed for user:', userId);
+  }
 }
 
 async function handleSubscriptionUpdated(subscription: SubscriptionWithPeriod) {
+  console.log('[stripe-webhook] handleSubscriptionUpdated called');
   const userId = subscription.metadata.supabase_user_id;
+
+  console.log('[stripe-webhook] Subscription update data:', {
+    id: subscription.id,
+    status: subscription.status,
+    userId,
+    cancel_at_period_end: subscription.cancel_at_period_end,
+    current_period_start: subscription.current_period_start,
+    current_period_end: subscription.current_period_end,
+  });
 
   if (!userId) {
     console.error('[stripe-webhook] No supabase_user_id in subscription metadata for subscription.updated');
     return;
   }
 
-  await supabaseAdmin
+  const { error } = await supabaseAdmin
     .from('profiles')
     .update({
       stripe_subscription_status: subscription.status,
@@ -203,12 +240,25 @@ async function handleSubscriptionUpdated(subscription: SubscriptionWithPeriod) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', userId);
+
+  if (error) {
+    console.error('[stripe-webhook] Failed to update subscription:', error);
+    throw error;
+  } else {
+    console.log('[stripe-webhook] Subscription updated successfully for user:', userId);
+  }
 }
 
 async function handleSubscriptionDeleted(subscription: SubscriptionWithPeriod) {
+  console.log('[stripe-webhook] handleSubscriptionDeleted called');
   const userId = subscription.metadata.supabase_user_id;
 
-  await supabaseAdmin
+  if (!userId) {
+    console.error('[stripe-webhook] No supabase_user_id in subscription metadata for subscription.deleted');
+    return;
+  }
+
+  const { error } = await supabaseAdmin
     .from('profiles')
     .update({
       stripe_subscription_status: 'canceled',
@@ -216,4 +266,11 @@ async function handleSubscriptionDeleted(subscription: SubscriptionWithPeriod) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', userId);
+
+  if (error) {
+    console.error('[stripe-webhook] Failed to update profile for subscription.deleted:', error);
+    throw error;
+  } else {
+    console.log('[stripe-webhook] Subscription deleted processed for user:', userId);
+  }
 }
