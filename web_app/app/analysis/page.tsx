@@ -313,6 +313,8 @@ function AnalysisContent() {
               "Limit Reached"
             ) : stats.totalGames === stats.analyzedGames ? (
               "All Analyzed"
+            ) : stats.analyzedGames > 0 ? (
+              "Analyze Remaining Games"
             ) : (
               "Analyze All Games"
             )}
