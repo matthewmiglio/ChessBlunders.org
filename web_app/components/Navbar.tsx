@@ -13,7 +13,7 @@ export function Navbar() {
 
   const navLinks = [
     { href: "/games", label: "Games" },
-    { href: "/analysis", label: "Analysis" },
+    { href: "/analysis", label: "Engine" },
     { href: "/practice", label: "Practice" },
     { href: "/progress", label: "Progress" },
     { href: "/account", label: isSubscribed ? "Subscription" : "Upgrade" },
