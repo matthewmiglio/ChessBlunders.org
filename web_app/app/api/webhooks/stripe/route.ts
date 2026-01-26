@@ -4,10 +4,12 @@ import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
 import { createClient } from '@supabase/supabase-js';
 
-// Type workarounds for Stripe SDK v20 type issues
-interface SubscriptionWithPeriod extends Stripe.Subscription {
-  current_period_start: number;
-  current_period_end: number;
+// Type workarounds for Stripe SDK type issues
+// Note: Stripe deprecated subscription-level current_period_start/end in API version 2025-03-31
+// These fields now live on subscription items instead
+interface SubscriptionItemWithPeriod {
+  current_period_start?: number;
+  current_period_end?: number;
 }
 
 interface InvoiceWithSubscription extends Stripe.Invoice {
@@ -24,6 +26,26 @@ function timestampToISO(timestamp: number | undefined | null): string | null {
   } catch {
     return null;
   }
+}
+
+// Helper to extract period values from subscription
+// Stripe moved these from subscription level to subscription item level
+function getSubscriptionPeriod(subscription: Stripe.Subscription): { start: number | null; end: number | null } {
+  // First try subscription item level (new location as of API 2025-03-31)
+  const item = subscription.items?.data?.[0] as unknown as SubscriptionItemWithPeriod | undefined;
+  if (item?.current_period_start && item?.current_period_end) {
+    return {
+      start: item.current_period_start,
+      end: item.current_period_end,
+    };
+  }
+
+  // Fallback to subscription level (deprecated but may still work on older API versions)
+  const sub = subscription as unknown as { current_period_start?: number; current_period_end?: number };
+  return {
+    start: sub.current_period_start || null,
+    end: sub.current_period_end || null,
+  };
 }
 
 // Use service role for webhook updates (bypasses RLS)
@@ -73,13 +95,13 @@ export async function POST(req: NextRequest) {
       }
 
       case 'customer.subscription.updated': {
-        const subscription = event.data.object as SubscriptionWithPeriod;
+        const subscription = event.data.object as Stripe.Subscription;
         await handleSubscriptionUpdated(subscription);
         break;
       }
 
       case 'customer.subscription.deleted': {
-        const subscription = event.data.object as SubscriptionWithPeriod;
+        const subscription = event.data.object as Stripe.Subscription;
         await handleSubscriptionDeleted(subscription);
         break;
       }
@@ -108,7 +130,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   }
 
   // Fetch full subscription details
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId) as unknown as SubscriptionWithPeriod;
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   const userId = subscription.metadata.supabase_user_id;
 
   console.log('[stripe-webhook] Subscription:', { id: subscription.id, status: subscription.status, userId });
@@ -118,11 +140,9 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     return;
   }
 
-  // Log the period values for debugging
-  console.log('[stripe-webhook] Period values:', {
-    current_period_start: subscription.current_period_start,
-    current_period_end: subscription.current_period_end,
-  });
+  // Get period values from subscription items (Stripe moved these in API 2025-03-31)
+  const period = getSubscriptionPeriod(subscription);
+  console.log('[stripe-webhook] Period values:', period);
 
   const { error } = await supabaseAdmin
     .from('profiles')
@@ -131,8 +151,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       stripe_subscription_id: subscriptionId,
       stripe_subscription_status: subscription.status,
       stripe_price_id: subscription.items.data[0]?.price?.id || null,
-      subscription_period_start: timestampToISO(subscription.current_period_start),
-      subscription_period_end: timestampToISO(subscription.current_period_end),
+      subscription_period_start: timestampToISO(period.start),
+      subscription_period_end: timestampToISO(period.end),
       cancel_at_period_end: subscription.cancel_at_period_end,
       updated_at: new Date().toISOString(),
     })
@@ -153,7 +173,7 @@ async function handleInvoicePaid(invoice: InvoiceWithSubscription) {
     return;
   }
 
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId) as unknown as SubscriptionWithPeriod;
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   const userId = subscription.metadata.supabase_user_id;
 
   if (!userId) {
@@ -161,12 +181,14 @@ async function handleInvoicePaid(invoice: InvoiceWithSubscription) {
     return;
   }
 
+  const period = getSubscriptionPeriod(subscription);
+
   const { error } = await supabaseAdmin
     .from('profiles')
     .update({
       stripe_subscription_status: 'active',
-      subscription_period_start: timestampToISO(subscription.current_period_start),
-      subscription_period_end: timestampToISO(subscription.current_period_end),
+      subscription_period_start: timestampToISO(period.start),
+      subscription_period_end: timestampToISO(period.end),
       updated_at: new Date().toISOString(),
     })
     .eq('id', userId);
@@ -187,7 +209,7 @@ async function handlePaymentFailed(invoice: InvoiceWithSubscription) {
     return;
   }
 
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId) as unknown as SubscriptionWithPeriod;
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   const userId = subscription.metadata.supabase_user_id;
 
   if (!userId) {
@@ -211,17 +233,17 @@ async function handlePaymentFailed(invoice: InvoiceWithSubscription) {
   }
 }
 
-async function handleSubscriptionUpdated(subscription: SubscriptionWithPeriod) {
+async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   console.log('[stripe-webhook] handleSubscriptionUpdated called');
   const userId = subscription.metadata.supabase_user_id;
+  const period = getSubscriptionPeriod(subscription);
 
   console.log('[stripe-webhook] Subscription update data:', {
     id: subscription.id,
     status: subscription.status,
     userId,
     cancel_at_period_end: subscription.cancel_at_period_end,
-    current_period_start: subscription.current_period_start,
-    current_period_end: subscription.current_period_end,
+    period,
   });
 
   if (!userId) {
@@ -234,8 +256,8 @@ async function handleSubscriptionUpdated(subscription: SubscriptionWithPeriod) {
     .update({
       stripe_subscription_status: subscription.status,
       stripe_price_id: subscription.items.data[0]?.price?.id || null,
-      subscription_period_start: timestampToISO(subscription.current_period_start),
-      subscription_period_end: timestampToISO(subscription.current_period_end),
+      subscription_period_start: timestampToISO(period.start),
+      subscription_period_end: timestampToISO(period.end),
       cancel_at_period_end: subscription.cancel_at_period_end,
       updated_at: new Date().toISOString(),
     })
@@ -249,7 +271,7 @@ async function handleSubscriptionUpdated(subscription: SubscriptionWithPeriod) {
   }
 }
 
-async function handleSubscriptionDeleted(subscription: SubscriptionWithPeriod) {
+async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   console.log('[stripe-webhook] handleSubscriptionDeleted called');
   const userId = subscription.metadata.supabase_user_id;
 
