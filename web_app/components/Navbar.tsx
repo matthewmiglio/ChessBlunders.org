@@ -17,6 +17,7 @@ export function Navbar() {
     { href: "/practice", label: "Practice" },
     { href: "/progress", label: "Progress" },
     { href: "/account", label: isSubscribed ? "Subscription" : "Upgrade" },
+    { href: "/feedback", label: "Feedback" },
   ];
 
   return (

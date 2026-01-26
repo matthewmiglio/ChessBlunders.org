@@ -6,6 +6,7 @@ import { PageViewsChart } from "@/components/PageViewsChart";
 import { TopPagesChart } from "@/components/TopPagesChart";
 import { TopCountriesChart } from "@/components/TopCountriesChart";
 import { SubscriptionStats } from "@/components/SubscriptionStats";
+import { FeedbackList } from "@/components/FeedbackList";
 
 interface Summary {
   total_views: number;
@@ -117,11 +118,19 @@ export default function Dashboard() {
         </section>
 
         {/* Subscription & Revenue Stats */}
-        <section>
+        <section className="mb-8">
           <h2 className="text-lg font-semibold text-gray-100 mb-4">
             Subscriptions & Revenue
           </h2>
           <SubscriptionStats />
+        </section>
+
+        {/* User Feedback */}
+        <section>
+          <h2 className="text-lg font-semibold text-gray-100 mb-4">
+            User Feedback
+          </h2>
+          <FeedbackList />
         </section>
       </main>
 
