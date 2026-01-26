@@ -7,6 +7,7 @@ import { TopPagesChart } from "@/components/TopPagesChart";
 import { TopCountriesChart } from "@/components/TopCountriesChart";
 import { SubscriptionStats } from "@/components/SubscriptionStats";
 import { FeedbackList } from "@/components/FeedbackList";
+import { PeriodComparison } from "@/components/PeriodComparison";
 
 interface Summary {
   total_views: number;
@@ -16,50 +17,38 @@ interface Summary {
 }
 
 export default function Dashboard() {
-  const [days, setDays] = useState(30);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchSummary() {
       setLoading(true);
-      const res = await fetch(`/api/analytics/summary?days=${days}`);
+      const res = await fetch("/api/analytics/summary");
       const data = await res.json();
       setSummary(data);
       setLoading(false);
     }
     fetchSummary();
-  }, [days]);
+  }, []);
 
   return (
     <div className="min-h-screen">
       {/* Header */}
       <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-white">ChessBlunders Analytics</h1>
-            <p className="text-sm text-gray-400">Page view analytics dashboard</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {[7, 30, 90].map((d) => (
-              <button
-                key={d}
-                onClick={() => setDays(d)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  days === d
-                    ? "bg-sky-500 text-white"
-                    : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-                }`}
-              >
-                {d}d
-              </button>
-            ))}
-          </div>
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <h1 className="text-xl font-bold text-white">ChessBlunders Analytics</h1>
+          <p className="text-sm text-gray-400">All-time statistics</p>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
+        {/* Period Comparison */}
+        <section className="mb-8">
+          <h2 className="text-lg font-semibold text-gray-100 mb-4">Recent Trends</h2>
+          <PeriodComparison />
+        </section>
+
         {/* Summary Stats */}
         <section className="mb-8">
           <h2 className="text-lg font-semibold text-gray-100 mb-4">Overview</h2>
@@ -76,7 +65,7 @@ export default function Dashboard() {
                 <StatCard
                   title="Total Page Views"
                   value={summary?.total_views?.toLocaleString() || "0"}
-                  subtitle={`Last ${days} days`}
+                  subtitle="All time"
                   color="sky"
                 />
                 <StatCard
@@ -105,15 +94,15 @@ export default function Dashboard() {
         {/* Page Views Chart */}
         <section className="mb-8">
           <h2 className="text-lg font-semibold text-gray-100 mb-4">Traffic Over Time</h2>
-          <PageViewsChart days={days} />
+          <PageViewsChart />
         </section>
 
         {/* Bottom Charts */}
         <section className="mb-8">
           <h2 className="text-lg font-semibold text-gray-100 mb-4">Breakdown</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <TopPagesChart days={days} />
-            <TopCountriesChart days={days} />
+            <TopPagesChart />
+            <TopCountriesChart />
           </div>
         </section>
 

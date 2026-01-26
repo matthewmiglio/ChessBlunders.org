@@ -1,13 +1,8 @@
 import { supabase } from "@/lib/supabase";
 import { NextResponse } from "next/server";
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const days = parseInt(searchParams.get("days") || "30");
-
-  const { data, error } = await supabase.rpc("get_pageviews_by_country", {
-    days_back: days,
-  });
+export async function GET() {
+  const { data, error } = await supabase.rpc("get_pageviews_by_country_all_time");
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

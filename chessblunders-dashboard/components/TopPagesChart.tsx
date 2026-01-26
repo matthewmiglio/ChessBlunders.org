@@ -15,20 +15,20 @@ const PATH_LABELS: Record<string, string> = {
   "/auth/signin": "Sign In",
 };
 
-export function TopPagesChart({ days }: { days: number }) {
+export function TopPagesChart() {
   const [data, setData] = useState<PageData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      const res = await fetch(`/api/analytics/pages?days=${days}`);
+      const res = await fetch("/api/analytics/pages");
       const json = await res.json();
       setData(json.slice(0, 10));
       setLoading(false);
     }
     fetchData();
-  }, [days]);
+  }, []);
 
   if (loading) {
     return (

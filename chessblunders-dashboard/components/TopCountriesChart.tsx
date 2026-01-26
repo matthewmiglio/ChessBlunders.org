@@ -25,20 +25,20 @@ const COUNTRY_FLAGS: Record<string, string> = {
   RU: "RU",
 };
 
-export function TopCountriesChart({ days }: { days: number }) {
+export function TopCountriesChart() {
   const [data, setData] = useState<CountryData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      const res = await fetch(`/api/analytics/countries?days=${days}`);
+      const res = await fetch("/api/analytics/countries");
       const json = await res.json();
       setData(json.slice(0, 10));
       setLoading(false);
     }
     fetchData();
-  }, [days]);
+  }, []);
 
   if (loading) {
     return (

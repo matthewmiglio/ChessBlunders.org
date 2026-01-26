@@ -7,20 +7,20 @@ interface DailyData {
   views: number;
 }
 
-export function PageViewsChart({ days }: { days: number }) {
+export function PageViewsChart() {
   const [data, setData] = useState<DailyData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      const res = await fetch(`/api/analytics/daily?days=${days}`);
+      const res = await fetch("/api/analytics/daily");
       const json = await res.json();
       setData(json);
       setLoading(false);
     }
     fetchData();
-  }, [days]);
+  }, []);
 
   if (loading) {
     return (
