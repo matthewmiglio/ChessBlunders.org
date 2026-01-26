@@ -16,7 +16,8 @@ interface ChessBoardProps {
   onMoveResult: (correct: boolean, moveUci: string) => void;
   playerSide: "w" | "b";
   isActive: boolean;
-  highlightSquare?: string | null;
+  hintArrow?: { from: string; to: string } | null;
+  onPieceClick?: () => void;
 }
 
 export default function ChessBoard({
@@ -25,7 +26,8 @@ export default function ChessBoard({
   onMoveResult,
   playerSide,
   isActive,
-  highlightSquare,
+  hintArrow,
+  onPieceClick,
 }: ChessBoardProps) {
   const [game, setGame] = useState(() => new Chess(fen));
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
@@ -111,11 +113,17 @@ export default function ChessBoard({
   };
 
   const handleSquareClick = ({
+    piece,
     square,
   }: {
     piece: { pieceType: string } | null;
     square: string;
   }) => {
+    // Notify parent when a piece is clicked (to hide hint arrow)
+    if (piece && onPieceClick) {
+      onPieceClick();
+    }
+
     const result = handleSquareClickHelper({
       square: square as Square,
       game,
@@ -154,11 +162,6 @@ export default function ChessBoard({
   const squareStyles = useMemo(() => {
     const styles: Record<string, React.CSSProperties> = {};
 
-    // Highlight square (hint)
-    if (highlightSquare) {
-      styles[highlightSquare] = { backgroundColor: "rgba(244, 67, 54, 0.5)" };
-    }
-
     // Selected square
     if (selectedSquare) {
       styles[selectedSquare] = {
@@ -193,7 +196,19 @@ export default function ChessBoard({
     });
 
     return styles;
-  }, [highlightSquare, selectedSquare, validMoves]);
+  }, [selectedSquare, validMoves]);
+
+  // Arrow for hint
+  const arrows = useMemo(() => {
+    if (hintArrow) {
+      return [{
+        startSquare: hintArrow.from,
+        endSquare: hintArrow.to,
+        color: "rgba(255, 111, 0, 0.8)"
+      }];
+    }
+    return [];
+  }, [hintArrow]);
 
   return (
     <div
@@ -217,6 +232,7 @@ export default function ChessBoard({
             darkSquareStyle: { backgroundColor: "#5994EF" },
             lightSquareStyle: { backgroundColor: "#F2F6FA" },
             boardStyle: { width: boardWidth, height: boardWidth },
+            arrows: arrows,
           }}
         />
       </div>

@@ -7,6 +7,7 @@ import { Analysis, Blunder } from "@/lib/supabase";
 import { toast } from "sonner";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { StatCard } from "@/components/StatCard";
+import { BoardPreview } from "@/components/BoardPreview";
 
 function AnalysisContent() {
   const { user, loading: authLoading } = useAuth();
@@ -254,29 +255,41 @@ function AnalysisContent() {
               {selectedAnalysis.blunders.map((blunder: Blunder, index: number) => (
                 <div
                   key={index}
-                  className="bg-[#3c3c3c]/50 border border-white/10 rounded-md p-5 hover:border-white/20 transition-colors"
+                  className="bg-[#3c3c3c]/50 border border-white/10 rounded-md p-4 hover:border-white/20 transition-colors"
                 >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium text-[#f5f5f5]">Move {blunder.move_number}</p>
-                      <p className="text-sm text-[#b4b4b4] mt-1">
-                        Played: <span className="font-mono text-[#f44336]">{blunder.move_played}</span>
-                      </p>
-                      <p className="text-sm text-[#b4b4b4]">
-                        Best: <span className="font-mono text-[#18be5d]">{blunder.best_move}</span>
-                      </p>
+                  <div className="flex gap-4 items-center">
+                    {/* Board Preview */}
+                    <div className="flex-shrink-0">
+                      <BoardPreview fen={blunder.fen} size={100} />
                     </div>
-                    <div className="text-right">
-                      <p className="text-[#f44336] font-semibold text-lg">
-                        -{blunder.eval_drop} cp
-                      </p>
+
+                    {/* Blunder Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-medium text-[#f5f5f5]">Move {blunder.move_number}</span>
+                        <span className="text-[#f44336] font-semibold text-sm">
+                          -{blunder.eval_drop} cp
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm text-[#b4b4b4]">
+                          Played: <span className="font-mono text-[#f44336]">{blunder.move_played}</span>
+                        </p>
+                        <p className="text-sm text-[#b4b4b4]">
+                          Best: <span className="font-mono text-[#18be5d]">{blunder.best_move}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Practice Button */}
+                    <div className="flex-shrink-0">
                       <button
                         onClick={() =>
                           router.push(
                             `/practice?analysisId=${selectedAnalysis.id}&blunderIndex=${index}`
                           )
                         }
-                        className="mt-3 inline-flex items-center justify-center rounded-md bg-[#18be5d] px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-[#18be5d]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#18be5d] transition-all"
+                        className="inline-flex items-center justify-center rounded-md bg-[#18be5d] px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-[#18be5d]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#18be5d] transition-all"
                       >
                         Practice
                       </button>

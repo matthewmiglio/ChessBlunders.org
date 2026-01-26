@@ -75,7 +75,7 @@ function checkMoveRank(userMoveUci: string, blunder: Blunder): MoveRank {
 }
 
 // Get feedback based on move rank
-function getMoveRankFeedback(rank: MoveRank, blunder: Blunder): { message: string; isCorrect: boolean } {
+function getMoveRankFeedback(rank: MoveRank): { message: string; isCorrect: boolean } {
   switch (rank) {
     case 1:
       return { message: "Best move! Well done.", isCorrect: true };
@@ -84,7 +84,7 @@ function getMoveRankFeedback(rank: MoveRank, blunder: Blunder): { message: strin
     case 3:
       return { message: "That's the #3 move - acceptable.", isCorrect: true };
     default:
-      return { message: `Incorrect. The best move was ${blunder.best_move}`, isCorrect: false };
+      return { message: "Incorrect. Try again!", isCorrect: false };
   }
 }
 
@@ -242,21 +242,42 @@ function PracticeContent() {
     setCurrentBlunder(randomPuzzle.blunder);
     setFeedback(null);
     setShowHint(false);
+    setPuzzleKey(prev => prev + 1);
   }, []);
+
+  const [puzzleKey, setPuzzleKey] = useState(0); // Key to force board reset
 
   const handleMoveResult = async (_correct: boolean, userMoveUci: string) => {
     if (!currentBlunder || !currentAnalysisId) return;
 
     // Check move against top 3 moves
     const rank = checkMoveRank(userMoveUci, currentBlunder);
-    const { message, isCorrect } = getMoveRankFeedback(rank, currentBlunder);
+    const { message, isCorrect } = getMoveRankFeedback(rank);
 
-    setFeedback({
-      correct: isCorrect,
-      message,
-      userMove: userMoveUci,
-      rank,
-    });
+    if (isCorrect) {
+      // Show success feedback
+      setFeedback({
+        correct: isCorrect,
+        message,
+        userMove: userMoveUci,
+        rank,
+      });
+    } else {
+      // Show brief incorrect feedback, then reset puzzle
+      setFeedback({
+        correct: false,
+        message,
+        userMove: userMoveUci,
+        rank: null,
+      });
+
+      // Reset the puzzle after a brief delay
+      setTimeout(() => {
+        setPuzzleKey(prev => prev + 1); // Force board to reset
+        setFeedback(null);
+        setShowHint(false);
+      }, 800);
+    }
 
     // Record attempt with move details for granular tracking
     try {
@@ -330,7 +351,17 @@ function PracticeContent() {
   }
 
   const playerSide = currentBlunder ? getPlayerSide(currentBlunder.fen) : "w";
-  const hintSquare = showHint && expectedMoveUci ? expectedMoveUci.slice(2, 4) : null;
+  const hintArrow = showHint && expectedMoveUci ? {
+    from: expectedMoveUci.slice(0, 2),
+    to: expectedMoveUci.slice(2, 4)
+  } : null;
+
+  const handlePieceClick = () => {
+    // Hide hint arrow when user clicks a piece
+    if (showHint) {
+      setShowHint(false);
+    }
+  };
 
   const activeFilterCount = Object.values(filters).filter(
     (v) => v !== undefined
@@ -462,12 +493,14 @@ function PracticeContent() {
               </div>
 
               <ChessBoard
+                key={puzzleKey}
                 fen={currentBlunder.fen}
                 expectedMove={expectedMoveUci}
                 onMoveResult={handleMoveResult}
                 playerSide={playerSide}
-                isActive={!feedback}
-                highlightSquare={hintSquare}
+                isActive={!feedback || !feedback.correct}
+                hintArrow={hintArrow}
+                onPieceClick={handlePieceClick}
               />
             </div>
           </div>
@@ -628,12 +661,14 @@ function PracticeContent() {
                     </div>
                   )}
 
-                  <button
-                    onClick={nextPuzzle}
-                    className="w-full inline-flex items-center justify-center rounded-md bg-[#8a2be2] px-6 py-3.5 text-sm font-medium text-white shadow-sm hover:bg-[#8a2be2]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8a2be2] transition-all"
-                  >
-                    Next Puzzle
-                  </button>
+                  {feedback.correct && (
+                    <button
+                      onClick={nextPuzzle}
+                      className="w-full inline-flex items-center justify-center rounded-md bg-[#8a2be2] px-6 py-3.5 text-sm font-medium text-white shadow-sm hover:bg-[#8a2be2]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8a2be2] transition-all"
+                    >
+                      Next Puzzle
+                    </button>
+                  )}
                 </div>
               )}
             </div>
