@@ -113,13 +113,13 @@ export default function GamesPage() {
             <option value="25" className="bg-[#2a2a2a] text-[#f5f5f5]">Last 25 games</option>
             <option value="50" className="bg-[#2a2a2a] text-[#f5f5f5]">Last 50 games</option>
             <option value="100" className="bg-[#2a2a2a] text-[#f5f5f5]">Last 100 games</option>
-            <option value="250" disabled={!isPremium} className="bg-[#2a2a2a] text-[#f5f5f5]">
+            <option value="250" disabled={!isPremium} className={`bg-[#2a2a2a] ${isPremium ? "text-[#f5f5f5]" : "text-[#707070]"}`}>
               Last 250 games {!isPremium && "(Premium)"}
             </option>
-            <option value="500" disabled={!isPremium} className="bg-[#2a2a2a] text-[#f5f5f5]">
+            <option value="500" disabled={!isPremium} className={`bg-[#2a2a2a] ${isPremium ? "text-[#f5f5f5]" : "text-[#707070]"}`}>
               Last 500 games {!isPremium && "(Premium)"}
             </option>
-            <option value="1000" disabled={!isPremium} className="bg-[#2a2a2a] text-[#f5f5f5]">
+            <option value="1000" disabled={!isPremium} className={`bg-[#2a2a2a] ${isPremium ? "text-[#f5f5f5]" : "text-[#707070]"}`}>
               Last 1000 games {!isPremium && "(Premium)"}
             </option>
           </select>
