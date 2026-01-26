@@ -29,6 +29,7 @@ function AnalysisContent() {
   const [analyzeProgress, setAnalyzeProgress] = useState({ current: 0, total: 0 });
   const [retentionLimitReached, setRetentionLimitReached] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const statsIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -46,8 +47,31 @@ function AnalysisContent() {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
       }
+      if (statsIntervalRef.current) {
+        clearInterval(statsIntervalRef.current);
+      }
     };
   }, [user]);
+
+  // Refresh stats every 15 seconds while analyzing
+  useEffect(() => {
+    if (analyzing) {
+      statsIntervalRef.current = setInterval(() => {
+        fetchStats();
+        fetchAnalyses();
+      }, 15000);
+    } else {
+      if (statsIntervalRef.current) {
+        clearInterval(statsIntervalRef.current);
+        statsIntervalRef.current = null;
+      }
+    }
+    return () => {
+      if (statsIntervalRef.current) {
+        clearInterval(statsIntervalRef.current);
+      }
+    };
+  }, [analyzing]);
 
   useEffect(() => {
     if (analysisId && analyses.length > 0) {
