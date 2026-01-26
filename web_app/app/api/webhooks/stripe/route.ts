@@ -14,6 +14,18 @@ interface InvoiceWithSubscription extends Stripe.Invoice {
   subscription: string | null;
 }
 
+// Helper to safely convert Unix timestamp to ISO string
+function timestampToISO(timestamp: number | undefined | null): string | null {
+  if (!timestamp || typeof timestamp !== 'number') {
+    return null;
+  }
+  try {
+    return new Date(timestamp * 1000).toISOString();
+  } catch {
+    return null;
+  }
+}
+
 // Use service role for webhook updates (bypasses RLS)
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -106,15 +118,21 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     return;
   }
 
+  // Log the period values for debugging
+  console.log('[stripe-webhook] Period values:', {
+    current_period_start: subscription.current_period_start,
+    current_period_end: subscription.current_period_end,
+  });
+
   const { error } = await supabaseAdmin
     .from('profiles')
     .update({
       stripe_customer_id: customerId,
       stripe_subscription_id: subscriptionId,
       stripe_subscription_status: subscription.status,
-      stripe_price_id: subscription.items.data[0].price.id,
-      subscription_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-      subscription_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      stripe_price_id: subscription.items.data[0]?.price?.id || null,
+      subscription_period_start: timestampToISO(subscription.current_period_start),
+      subscription_period_end: timestampToISO(subscription.current_period_end),
       cancel_at_period_end: subscription.cancel_at_period_end,
       updated_at: new Date().toISOString(),
     })
@@ -134,12 +152,17 @@ async function handleInvoicePaid(invoice: InvoiceWithSubscription) {
   const subscription = await stripe.subscriptions.retrieve(subscriptionId) as unknown as SubscriptionWithPeriod;
   const userId = subscription.metadata.supabase_user_id;
 
+  if (!userId) {
+    console.error('[stripe-webhook] No supabase_user_id in subscription metadata for invoice.paid');
+    return;
+  }
+
   await supabaseAdmin
     .from('profiles')
     .update({
       stripe_subscription_status: 'active',
-      subscription_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-      subscription_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      subscription_period_start: timestampToISO(subscription.current_period_start),
+      subscription_period_end: timestampToISO(subscription.current_period_end),
       updated_at: new Date().toISOString(),
     })
     .eq('id', userId);
@@ -164,13 +187,18 @@ async function handlePaymentFailed(invoice: InvoiceWithSubscription) {
 async function handleSubscriptionUpdated(subscription: SubscriptionWithPeriod) {
   const userId = subscription.metadata.supabase_user_id;
 
+  if (!userId) {
+    console.error('[stripe-webhook] No supabase_user_id in subscription metadata for subscription.updated');
+    return;
+  }
+
   await supabaseAdmin
     .from('profiles')
     .update({
       stripe_subscription_status: subscription.status,
-      stripe_price_id: subscription.items.data[0].price.id,
-      subscription_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-      subscription_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      stripe_price_id: subscription.items.data[0]?.price?.id || null,
+      subscription_period_start: timestampToISO(subscription.current_period_start),
+      subscription_period_end: timestampToISO(subscription.current_period_end),
       cancel_at_period_end: subscription.cancel_at_period_end,
       updated_at: new Date().toISOString(),
     })
