@@ -33,6 +33,9 @@ local_python/data/
 local_python/poetry.lock
 local_python/config.json
 
+# Stripe CLI config (contains API keys)
+stripe/config.json
+
 # web_app (Next.js)
 web_app/node_modules/
 web_app/.next/

@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "chessblunders-stripe-cli"
+version = "0.1.0"
+description = "Read-only CLI for ChessBlunders Stripe data"
+authors = ["ChessBlunders"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+stripe = "^7.0.0"
+rich = "^13.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -221,7 +221,12 @@ export default function SubscriptionManager({
   }
 
   // Subscribed - show management options
-  const isSetToCancel = profile?.cancel_at_period_end;
+  // isSetToCancel is true if:
+  // 1. cancel_at_period_end is true (scheduled to cancel at end of period), OR
+  // 2. stripe_subscription_status is 'canceled' (already fully canceled in Stripe)
+  const isSetToCancel = profile?.cancel_at_period_end || profile?.stripe_subscription_status === 'canceled';
+  // If subscription is fully canceled (not just scheduled), user cannot reactivate
+  const isFullyCanceled = profile?.stripe_subscription_status === 'canceled';
   const periodEnd = profile?.subscription_period_end
     ? new Date(profile.subscription_period_end).toLocaleDateString()
     : null;
@@ -247,7 +252,9 @@ export default function SubscriptionManager({
       {isSetToCancel && (
         <div className="mb-6 p-3 rounded-lg bg-[#ff6f00]/10 border border-[#ff6f00]/30">
           <p className="text-sm text-[#ff6f00]">
-            Your subscription will end on {periodEnd}. You can reactivate anytime before then.
+            {isFullyCanceled
+              ? `Your subscription has been canceled. You have access until ${periodEnd}.`
+              : `Your subscription will end on ${periodEnd}. You can reactivate anytime before then.`}
           </p>
         </div>
       )}
@@ -291,7 +298,12 @@ export default function SubscriptionManager({
 
       {/* Action buttons */}
       <div className="flex flex-wrap gap-3 mb-6">
-        {isSetToCancel ? (
+        {isFullyCanceled ? (
+          // Subscription is fully canceled - no cancel/reactivate options
+          <span className="inline-flex items-center justify-center rounded-md bg-[#3c3c3c] px-4 py-2 text-sm font-medium text-[#b4b4b4]">
+            Subscription Canceled
+          </span>
+        ) : isSetToCancel ? (
           <button
             onClick={handleReactivate}
             disabled={loading !== null}
