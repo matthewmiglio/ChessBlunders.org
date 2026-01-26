@@ -21,6 +21,7 @@ const supabaseAdmin = createClient(
 );
 
 export async function POST(req: NextRequest) {
+  console.log('[stripe-webhook] Received webhook request');
   const body = await req.text();
   const headersList = await headers();
   const signature = headersList.get('stripe-signature')!;
@@ -33,8 +34,9 @@ export async function POST(req: NextRequest) {
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!
     );
+    console.log('[stripe-webhook] Event verified:', event.type);
   } catch (err) {
-    console.error('Webhook signature verification failed:', err);
+    console.error('[stripe-webhook] Signature verification failed:', err);
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
@@ -82,14 +84,29 @@ export async function POST(req: NextRequest) {
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  console.log('[stripe-webhook] handleCheckoutCompleted called');
+  console.log('[stripe-webhook] Session:', { id: session.id, customer: session.customer, subscription: session.subscription });
+
   const subscriptionId = session.subscription as string;
   const customerId = session.customer as string;
+
+  if (!subscriptionId) {
+    console.error('[stripe-webhook] No subscription ID in session');
+    return;
+  }
 
   // Fetch full subscription details
   const subscription = await stripe.subscriptions.retrieve(subscriptionId) as unknown as SubscriptionWithPeriod;
   const userId = subscription.metadata.supabase_user_id;
 
-  await supabaseAdmin
+  console.log('[stripe-webhook] Subscription:', { id: subscription.id, status: subscription.status, userId });
+
+  if (!userId) {
+    console.error('[stripe-webhook] No supabase_user_id in subscription metadata');
+    return;
+  }
+
+  const { error } = await supabaseAdmin
     .from('profiles')
     .update({
       stripe_customer_id: customerId,
@@ -102,6 +119,12 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', userId);
+
+  if (error) {
+    console.error('[stripe-webhook] Failed to update profile:', error);
+  } else {
+    console.log('[stripe-webhook] Profile updated successfully for user:', userId);
+  }
 }
 
 async function handleInvoicePaid(invoice: InvoiceWithSubscription) {

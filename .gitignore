@@ -1,6 +1,9 @@
 # Claude
 .claude/
 
+#stripe logs 
+stripe_logs/
+
 # Python
 __pycache__/
 *.py[cod]
