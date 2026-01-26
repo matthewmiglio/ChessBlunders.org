@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "vercel-cli"
+version = "0.1.0"
+description = "ChessBlunders Vercel CLI"
+authors = ["matthewmiglio"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+requests = "^2.31"
+rich = "^13.7"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
