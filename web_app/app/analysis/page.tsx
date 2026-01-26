@@ -307,7 +307,7 @@ function AnalysisContent() {
             {analyzing ? (
               <>
                 <div className="w-4 h-4 border-2 border-[#202020] border-t-transparent rounded-full animate-spin mr-2" />
-                Analyzing {analyzeProgress.current}/{analyzeProgress.total}
+                Analyzing...
               </>
             ) : retentionLimitReached ? (
               "Limit Reached"
