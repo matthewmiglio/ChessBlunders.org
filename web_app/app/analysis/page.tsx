@@ -340,7 +340,7 @@ function AnalysisContent() {
         />
         {!stats.isPremium && stats.retentionLimit && (
           <StatCard
-            label="Retention"
+            label="Analysis Limit"
             value={`${stats.analyzedGames}/${stats.retentionLimit}`}
             sublabel={retentionLimitReached ? "Limit reached" : `${stats.retentionLimit - stats.analyzedGames} remaining`}
             valueColor={retentionLimitReached ? "text-[#f44336]" : "text-[#ff6f00]"}
