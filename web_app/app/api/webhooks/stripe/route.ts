@@ -160,6 +160,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   if (error) {
     console.error('[stripe-webhook] Failed to update profile:', error);
+    throw error;
   } else {
     console.log('[stripe-webhook] Profile updated successfully for user:', userId);
   }
