@@ -1,13 +1,21 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, Suspense, useCallback, useRef } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Analysis, Blunder } from "@/lib/supabase";
 import { toast } from "sonner";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { StatCard } from "@/components/StatCard";
 import { BoardPreview } from "@/components/BoardPreview";
+
+const BATCH_SIZE = 20;
+
+interface UnanalyzedGame {
+  id: string;
+  pgn: string;
+  user_color: string | null;
+}
 
 function AnalysisContent() {
   const { user, loading: authLoading } = useAuth();
@@ -16,9 +24,7 @@ function AnalysisContent() {
   const analysisId = searchParams.get("id");
 
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
-  const [selectedAnalysis, setSelectedAnalysis] = useState<Analysis | null>(
-    null
-  );
+  const [selectedAnalysis, setSelectedAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalGames: 0,
@@ -29,8 +35,7 @@ function AnalysisContent() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeProgress, setAnalyzeProgress] = useState({ current: 0, total: 0 });
   const [retentionLimitReached, setRetentionLimitReached] = useState(false);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const statsIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const abortRef = useRef(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -42,37 +47,8 @@ function AnalysisContent() {
     if (user) {
       fetchAnalyses();
       fetchStats();
-      checkJobStatus();
     }
-    return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
-      if (statsIntervalRef.current) {
-        clearInterval(statsIntervalRef.current);
-      }
-    };
   }, [user]);
-
-  // Refresh stats every 15 seconds while analyzing
-  useEffect(() => {
-    if (analyzing) {
-      statsIntervalRef.current = setInterval(() => {
-        fetchStats();
-        fetchAnalyses();
-      }, 15000);
-    } else {
-      if (statsIntervalRef.current) {
-        clearInterval(statsIntervalRef.current);
-        statsIntervalRef.current = null;
-      }
-    }
-    return () => {
-      if (statsIntervalRef.current) {
-        clearInterval(statsIntervalRef.current);
-      }
-    };
-  }, [analyzing]);
 
   useEffect(() => {
     if (analysisId && analyses.length > 0) {
@@ -93,7 +69,6 @@ function AnalysisContent() {
         isPremium: data.isPremium || false,
         retentionLimit: data.retentionLimit,
       });
-      // Check if retention limit is reached for free users
       if (!data.isPremium && data.retentionLimit && data.analyzedGames >= data.retentionLimit) {
         setRetentionLimitReached(true);
       } else {
@@ -116,97 +91,109 @@ function AnalysisContent() {
     }
   };
 
-  const checkJobStatus = useCallback(async () => {
-    try {
-      const response = await fetch("/api/analysis/status");
-      const data = await response.json();
-
-      if (data.hasJob && (data.status === "running" || data.status === "pending")) {
-        setAnalyzing(true);
-        setAnalyzeProgress({ current: data.current, total: data.total });
-        startPolling();
-      } else if (data.hasJob && data.status === "completed") {
-        setAnalyzing(false);
-        setAnalyzeProgress({ current: 0, total: 0 });
-      }
-    } catch (error) {
-      console.error("Error checking job status:", error);
-    }
-  }, []);
-
-  const startPolling = useCallback(() => {
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-    }
-
-    pollIntervalRef.current = setInterval(async () => {
-      try {
-        const response = await fetch("/api/analysis/status");
-        const data = await response.json();
-
-        if (data.hasJob) {
-          setAnalyzeProgress({ current: data.current, total: data.total });
-
-          if (data.status === "completed") {
-            setAnalyzing(false);
-            setAnalyzeProgress({ current: 0, total: 0 });
-            if (pollIntervalRef.current) {
-              clearInterval(pollIntervalRef.current);
-              pollIntervalRef.current = null;
-            }
-            toast.success(`Analysis complete! ${data.current} games analyzed.`);
-            fetchAnalyses();
-            fetchStats();
-          } else if (data.status === "failed") {
-            setAnalyzing(false);
-            setAnalyzeProgress({ current: 0, total: 0 });
-            if (pollIntervalRef.current) {
-              clearInterval(pollIntervalRef.current);
-              pollIntervalRef.current = null;
-            }
-            toast.error(`Analysis failed: ${data.error || "Unknown error"}`);
-          }
-        }
-      } catch (error) {
-        console.error("Error polling job status:", error);
-      }
-    }, 2000);
-  }, []);
-
   const analyzeAll = async () => {
     setAnalyzing(true);
-    try {
-      const response = await fetch("/api/analysis/all", {
-        method: "POST",
-      });
+    abortRef.current = false;
 
+    try {
+      // Fetch unanalyzed games
+      const response = await fetch("/api/analysis/unanalyzed");
       const data = await response.json();
 
-      if (response.ok) {
-        if (data.message === "All games already analyzed") {
-          toast.info("All games are already analyzed!");
-          setAnalyzing(false);
-          return;
+      if (!response.ok) {
+        toast.error(data.error || "Failed to fetch games");
+        setAnalyzing(false);
+        return;
+      }
+
+      if (data.limitReached) {
+        setRetentionLimitReached(true);
+        toast.error("Free analysis limit reached");
+        setAnalyzing(false);
+        return;
+      }
+
+      const unanalyzedGames: UnanalyzedGame[] = data.games || [];
+
+      if (unanalyzedGames.length === 0) {
+        toast.info("All games are already analyzed!");
+        setAnalyzing(false);
+        return;
+      }
+
+      const totalToAnalyze = unanalyzedGames.length;
+      const startingCount = data.alreadyAnalyzed || 0;
+
+      setAnalyzeProgress({
+        current: startingCount,
+        total: startingCount + totalToAnalyze
+      });
+
+      let analyzed = 0;
+      let failed = 0;
+
+      // Process in batches
+      for (let i = 0; i < unanalyzedGames.length; i += BATCH_SIZE) {
+        if (abortRef.current) {
+          toast.info(`Analysis stopped. ${analyzed} games analyzed.`);
+          break;
         }
 
-        setAnalyzeProgress({ current: data.current || 0, total: data.total || 0 });
-        toast.success("Analysis started! You can close this page - it will continue in the background.");
-        startPolling();
-      } else if (response.status === 403 && data.upgrade) {
-        // Retention limit reached
-        setRetentionLimitReached(true);
-        toast.error(data.error || "You have reached the free analysis limit");
-        setAnalyzing(false);
-        fetchStats(); // Refresh stats
-      } else {
-        toast.error(data.error || "Failed to start analysis");
-        setAnalyzing(false);
+        const batch = unanalyzedGames.slice(i, i + BATCH_SIZE);
+
+        const results = await Promise.allSettled(
+          batch.map(game =>
+            fetch("/api/analysis/single", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ gameId: game.id })
+            }).then(res => res.json())
+          )
+        );
+
+        for (const result of results) {
+          if (result.status === "fulfilled" && result.value.success) {
+            analyzed++;
+          } else {
+            failed++;
+            if (result.status === "fulfilled" && result.value.limitReached) {
+              setRetentionLimitReached(true);
+              toast.error("Free analysis limit reached");
+              abortRef.current = true;
+              break;
+            }
+          }
+        }
+
+        setAnalyzeProgress({
+          current: startingCount + analyzed + failed,
+          total: startingCount + totalToAnalyze
+        });
+
+        // Refresh analyses list periodically
+        if ((i + BATCH_SIZE) % 40 === 0 || i + BATCH_SIZE >= unanalyzedGames.length) {
+          fetchAnalyses();
+        }
       }
+
+      if (!abortRef.current) {
+        toast.success(`Analysis complete! ${analyzed} games analyzed.`);
+      }
+
+      // Final refresh
+      await fetchAnalyses();
+      await fetchStats();
+
     } catch (error) {
       console.error("Error analyzing games:", error);
-      toast.error("Failed to start analysis");
+      toast.error("Analysis failed");
+    } finally {
       setAnalyzing(false);
     }
+  };
+
+  const stopAnalysis = () => {
+    abortRef.current = true;
   };
 
   if (authLoading || loading) {
@@ -258,12 +245,9 @@ function AnalysisContent() {
                   className="bg-[#3c3c3c]/50 border border-white/10 rounded-md p-4 hover:border-white/20 transition-colors"
                 >
                   <div className="flex gap-4 items-center">
-                    {/* Board Preview */}
                     <div className="flex-shrink-0">
                       <BoardPreview fen={blunder.fen} size={100} />
                     </div>
-
-                    {/* Blunder Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="font-medium text-[#f5f5f5]">Move {blunder.move_number}</span>
@@ -280,8 +264,6 @@ function AnalysisContent() {
                         </p>
                       </div>
                     </div>
-
-                    {/* Practice Button */}
                     <div className="flex-shrink-0">
                       <button
                         onClick={() =>
@@ -308,30 +290,47 @@ function AnalysisContent() {
     <div>
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#f5f5f5]">Analysis</h1>
-        <button
-          onClick={analyzeAll}
-          disabled={analyzing || stats.totalGames === stats.analyzedGames || retentionLimitReached}
-          className="inline-flex items-center justify-center rounded-md bg-[#ebebeb] px-5 py-2.5 text-sm font-medium text-[#202020] shadow-sm hover:bg-[#ebebeb]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8c8c8c] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-        >
-          {analyzing ? (
-            <>
-              <div className="w-4 h-4 border-2 border-[#202020] border-t-transparent rounded-full animate-spin mr-2" />
-              Analyzing...
-            </>
-          ) : retentionLimitReached ? (
-            "Limit Reached"
-          ) : (
-            "Analyze All Games"
+        <div className="flex gap-3">
+          {analyzing && (
+            <button
+              onClick={stopAnalysis}
+              className="inline-flex items-center justify-center rounded-md bg-[#f44336] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#f44336]/90 transition-all"
+            >
+              Stop
+            </button>
           )}
-        </button>
+          <button
+            onClick={analyzeAll}
+            disabled={analyzing || stats.totalGames === stats.analyzedGames || retentionLimitReached}
+            className="inline-flex items-center justify-center rounded-md bg-[#ebebeb] px-5 py-2.5 text-sm font-medium text-[#202020] shadow-sm hover:bg-[#ebebeb]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8c8c8c] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            {analyzing ? (
+              <>
+                <div className="w-4 h-4 border-2 border-[#202020] border-t-transparent rounded-full animate-spin mr-2" />
+                Analyzing {analyzeProgress.current}/{analyzeProgress.total}
+              </>
+            ) : retentionLimitReached ? (
+              "Limit Reached"
+            ) : stats.totalGames === stats.analyzedGames ? (
+              "All Analyzed"
+            ) : (
+              "Analyze All Games"
+            )}
+          </button>
+        </div>
       </div>
 
       {analyzing && (
-        <div className="bg-[#f44336]/10 border border-[#f44336]/30 rounded-lg p-5 mb-8">
-          <p className="text-[#f44336] text-sm mb-3">
-            Analysis is running in the background. You can close this page and come back later.
-          </p>
-          <div className="bg-[#202020] rounded-full h-2 overflow-hidden">
+        <div className="bg-[#202020] border border-white/10 rounded-lg p-5 mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[#f5f5f5] text-sm font-medium">
+              Analyzing games... Keep this page open.
+            </p>
+            <p className="text-[#b4b4b4] text-sm">
+              {analyzeProgress.current}/{analyzeProgress.total}
+            </p>
+          </div>
+          <div className="bg-[#3c3c3c] rounded-full h-2 overflow-hidden">
             <div
               className="bg-gradient-to-r from-[#f44336] to-[#ff6f00] h-2 rounded-full transition-all duration-300"
               style={{
@@ -341,10 +340,12 @@ function AnalysisContent() {
               }}
             />
           </div>
+          <p className="text-[#b4b4b4] text-xs mt-2">
+            Processing {BATCH_SIZE} games at a time. You can stop and resume anytime.
+          </p>
         </div>
       )}
 
-      {/* Retention limit warning/upgrade prompt */}
       {retentionLimitReached && !stats.isPremium && (
         <div className="bg-[#f44336]/10 border border-[#f44336]/30 rounded-lg p-5 mb-8">
           <p className="text-[#f5f5f5] font-medium mb-2">
