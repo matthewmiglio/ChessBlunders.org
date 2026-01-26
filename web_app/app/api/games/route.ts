@@ -15,15 +15,23 @@ export async function GET(request: NextRequest) {
   }
 
   const searchParams = request.nextUrl.searchParams;
-  const limit = parseInt(searchParams.get("limit") || "50");
+  const limitParam = searchParams.get("limit");
   const offset = parseInt(searchParams.get("offset") || "0");
 
-  const { data: games, error } = await supabase
+  // Build query
+  let query = supabase
     .from("games")
     .select("*")
     .eq("user_id", user.id)
-    .order("played_at", { ascending: false })
-    .range(offset, offset + limit - 1);
+    .order("played_at", { ascending: false });
+
+  // Only apply range if limit is specified (otherwise fetch all)
+  if (limitParam) {
+    const limit = parseInt(limitParam);
+    query = query.range(offset, offset + limit - 1);
+  }
+
+  const { data: games, error } = await query;
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
