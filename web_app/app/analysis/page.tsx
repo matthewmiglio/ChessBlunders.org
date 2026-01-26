@@ -33,6 +33,7 @@ function AnalysisContent() {
     retentionLimit: 100 as number | null
   });
   const [analyzing, setAnalyzing] = useState(false);
+  const [stopping, setStopping] = useState(false);
   const [analyzeProgress, setAnalyzeProgress] = useState({ current: 0, total: 0 });
   const [retentionLimitReached, setRetentionLimitReached] = useState(false);
   const abortRef = useRef(false);
@@ -218,11 +219,14 @@ function AnalysisContent() {
       toast.error("Analysis failed");
     } finally {
       setAnalyzing(false);
+      setStopping(false);
     }
   };
 
   const stopAnalysis = () => {
     abortRef.current = true;
+    setStopping(true);
+    toast.info("Stopping analysis...");
   };
 
   if (authLoading || loading) {
@@ -323,14 +327,15 @@ function AnalysisContent() {
           {analyzing && (
             <button
               onClick={stopAnalysis}
-              className="inline-flex items-center justify-center rounded-md bg-[#f44336] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#f44336]/90 transition-all"
+              disabled={stopping}
+              className="inline-flex items-center justify-center rounded-md bg-[#f44336] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#f44336]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              Stop
+              {stopping ? "Stopping..." : "Stop"}
             </button>
           )}
           <button
             onClick={analyzeAll}
-            disabled={analyzing || stats.totalGames === stats.analyzedGames || retentionLimitReached}
+            disabled={analyzing || stopping || stats.totalGames === stats.analyzedGames || retentionLimitReached}
             className="inline-flex items-center justify-center rounded-md bg-[#ebebeb] px-5 py-2.5 text-sm font-medium text-[#202020] shadow-sm hover:bg-[#ebebeb]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8c8c8c] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             {analyzing ? (
@@ -355,7 +360,7 @@ function AnalysisContent() {
         <div className="bg-[#202020] border border-white/10 rounded-lg p-5 mb-8">
           <div className="flex items-center justify-between mb-3">
             <p className="text-[#f5f5f5] text-sm font-medium">
-              Analyzing games... Keep this page open.
+              {stopping ? "Stopping... Finishing current batch." : "Analyzing games... Keep this page open."}
             </p>
             <p className="text-[#b4b4b4] text-sm">
               {analyzeProgress.current}/{analyzeProgress.total}
@@ -363,7 +368,7 @@ function AnalysisContent() {
           </div>
           <div className="bg-[#3c3c3c] rounded-full h-2 overflow-hidden">
             <div
-              className="bg-gradient-to-r from-[#f44336] to-[#ff6f00] h-2 rounded-full transition-all duration-300"
+              className={`h-2 rounded-full transition-all duration-300 ${stopping ? "bg-[#f44336]" : "bg-gradient-to-r from-[#f44336] to-[#ff6f00]"}`}
               style={{
                 width: analyzeProgress.total > 0
                   ? `${(analyzeProgress.current / analyzeProgress.total) * 100}%`
@@ -372,7 +377,7 @@ function AnalysisContent() {
             />
           </div>
           <p className="text-[#b4b4b4] text-xs mt-2">
-            Processing {BATCH_SIZE} games at a time. You can stop and resume anytime.
+            {stopping ? "Analysis will stop after the current batch completes." : `Processing ${BATCH_SIZE} games at a time. You can stop and resume anytime.`}
           </p>
         </div>
       )}

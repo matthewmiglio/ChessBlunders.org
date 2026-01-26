@@ -6,6 +6,8 @@ import { Game } from "@/lib/supabase";
 type SortKey = "played_at" | "opponent" | "user_color" | "result" | "time_class";
 type SortDirection = "asc" | "desc";
 
+const ITEMS_PER_PAGE = 25;
+
 interface GamesTableProps {
   games: Game[];
 }
@@ -13,6 +15,7 @@ interface GamesTableProps {
 export function GamesTable({ games }: GamesTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("played_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -21,6 +24,7 @@ export function GamesTable({ games }: GamesTableProps) {
       setSortKey(key);
       setSortDirection("desc");
     }
+    setCurrentPage(1); // Reset to first page when sorting changes
   };
 
   const sortedGames = useMemo(() => {
@@ -48,6 +52,10 @@ export function GamesTable({ games }: GamesTableProps) {
       return 0;
     });
   }, [games, sortKey, sortDirection]);
+
+  const totalPages = Math.ceil(sortedGames.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedGames = sortedGames.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const SortIcon = ({ columnKey }: { columnKey: SortKey }) => {
     if (sortKey !== columnKey) {
@@ -114,7 +122,7 @@ export function GamesTable({ games }: GamesTableProps) {
           </tr>
         </thead>
         <tbody className="divide-y divide-white/5">
-          {sortedGames.map((game) => (
+          {paginatedGames.map((game) => (
             <tr key={game.id} className="hover:bg-white/5 transition-colors">
               <td className="px-6 py-4 whitespace-nowrap text-sm text-[#b4b4b4]">
                 {game.played_at
@@ -151,6 +159,48 @@ export function GamesTable({ games }: GamesTableProps) {
           ))}
         </tbody>
       </table>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-6 py-4 border-t border-white/10">
+          <p className="text-sm text-[#b4b4b4]">
+            Showing {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, sortedGames.length)} of {sortedGames.length} games
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 text-sm text-[#b4b4b4] hover:text-[#f5f5f5] hover:bg-white/5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              First
+            </button>
+            <button
+              onClick={() => setCurrentPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 text-sm text-[#b4b4b4] hover:text-[#f5f5f5] hover:bg-white/5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="px-3 py-1.5 text-sm text-[#f5f5f5]">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 text-sm text-[#b4b4b4] hover:text-[#f5f5f5] hover:bg-white/5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 text-sm text-[#b4b4b4] hover:text-[#f5f5f5] hover:bg-white/5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Last
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
