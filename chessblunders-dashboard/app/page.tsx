@@ -5,6 +5,7 @@ import { StatCard, StatCardSkeleton } from "@/components/StatCard";
 import { PageViewsChart } from "@/components/PageViewsChart";
 import { TopPagesChart } from "@/components/TopPagesChart";
 import { TopCountriesChart } from "@/components/TopCountriesChart";
+import { SubscriptionStats } from "@/components/SubscriptionStats";
 
 interface Summary {
   total_views: number;
@@ -107,12 +108,20 @@ export default function Dashboard() {
         </section>
 
         {/* Bottom Charts */}
-        <section>
+        <section className="mb-8">
           <h2 className="text-lg font-semibold text-gray-100 mb-4">Breakdown</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <TopPagesChart days={days} />
             <TopCountriesChart days={days} />
           </div>
+        </section>
+
+        {/* Subscription & Revenue Stats */}
+        <section>
+          <h2 className="text-lg font-semibold text-gray-100 mb-4">
+            Subscriptions & Revenue
+          </h2>
+          <SubscriptionStats />
         </section>
       </main>
 
