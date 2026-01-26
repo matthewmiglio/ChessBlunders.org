@@ -1,19 +1,40 @@
-import { NextResponse, after } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase-server";
+import { checkPremiumAccess } from "@/lib/premium";
 import { Chess } from "chess.js";
-import { Blunder } from "@/lib/supabase";
+import { Blunder, TopMove } from "@/lib/supabase";
 
 // Force dynamic rendering
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 minutes max
 
 const LAMBDA_URL = "https://0y0qc8c0hk.execute-api.us-east-1.amazonaws.com/prod/analyze";
-const ANALYSIS_DEPTH = 12;
+const DEFAULT_ANALYSIS_DEPTH = 12;
+const MAX_FREE_DEPTH = 12;
+const MAX_PREMIUM_DEPTH = 25;
 const CONCURRENCY_LIMIT = 20;
+const MAX_FREE_ANALYSES = 100; // Total analyses a free user can retain
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     console.log("[analysis/all] POST request started");
+
+    // Parse optional depth from request body
+    let requestedDepth = DEFAULT_ANALYSIS_DEPTH;
+    try {
+      const body = await request.json();
+      if (body.depth) {
+        requestedDepth = parseInt(body.depth) || DEFAULT_ANALYSIS_DEPTH;
+      }
+    } catch {
+      // No body or invalid JSON - use default depth
+    }
+
+    // Check premium status for depth limits
+    const isPremium = await checkPremiumAccess();
+    const maxDepth = isPremium ? MAX_PREMIUM_DEPTH : MAX_FREE_DEPTH;
+    const analysisDepth = Math.min(requestedDepth, maxDepth);
+    console.log(`[analysis/all] Using depth ${analysisDepth} (requested: ${requestedDepth}, premium: ${isPremium})`);
 
     let supabase;
     try {
@@ -78,6 +99,34 @@ export async function POST() {
     });
   }
 
+  // Check retention limit for free users
+  let existingAnalysesCount = 0;
+  if (!isPremium) {
+    console.log("[analysis/all] Checking retention limit for free user...");
+    const { count, error: countError } = await supabase
+      .from("analysis")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id);
+
+    if (countError) {
+      console.error("[analysis/all] Error counting analyses:", countError);
+      return NextResponse.json({ error: "Failed to check analysis count" }, { status: 500 });
+    }
+
+    existingAnalysesCount = count || 0;
+    console.log(`[analysis/all] Free user has ${existingAnalysesCount}/${MAX_FREE_ANALYSES} analyses`);
+
+    if (existingAnalysesCount >= MAX_FREE_ANALYSES) {
+      console.log("[analysis/all] Free user has reached retention limit");
+      return NextResponse.json({
+        error: "You have reached the free analysis limit (100 games)",
+        upgrade: true,
+        limit: MAX_FREE_ANALYSES,
+        current: existingAnalysesCount,
+      }, { status: 403 });
+    }
+  }
+
   // Get all games using pagination (Supabase default limit is 1000)
   console.log("[analysis/all] Fetching games...");
   const allGames: { id: string; pgn: string; user_color: string | null }[] = [];
@@ -140,12 +189,21 @@ export async function POST() {
   console.log(`[analysis/all] Found ${allAnalyzedIds.length} already analyzed games`);
 
   const analyzedGameIds = new Set(allAnalyzedIds);
-  const unanalyzedGames = allGames.filter((g) => !analyzedGameIds.has(g.id));
+  let unanalyzedGames = allGames.filter((g) => !analyzedGameIds.has(g.id));
   console.log(`[analysis/all] Unanalyzed games: ${unanalyzedGames.length}`);
 
   if (unanalyzedGames.length === 0) {
     console.log("[analysis/all] All games already analyzed");
     return NextResponse.json({ message: "All games already analyzed" });
+  }
+
+  // Cap unanalyzed games to remaining slots for free users
+  if (!isPremium) {
+    const remainingSlots = MAX_FREE_ANALYSES - existingAnalysesCount;
+    if (unanalyzedGames.length > remainingSlots) {
+      console.log(`[analysis/all] Capping analysis to ${remainingSlots} games (remaining free slots)`);
+      unanalyzedGames = unanalyzedGames.slice(0, remainingSlots);
+    }
   }
 
   // Create job record
@@ -197,7 +255,7 @@ export async function POST() {
 
         const results = await Promise.allSettled(
           batch.map(async (game) => {
-            const blunders = await analyzeGame(game.pgn, game.user_color, 100, bgSupabase, user.id);
+            const blunders = await analyzeGame(game.pgn, game.user_color, 100, bgSupabase, user.id, analysisDepth);
             await bgSupabase.from("analysis").insert({
               game_id: game.id,
               user_id: user.id,
@@ -255,6 +313,11 @@ export async function POST() {
     current: 0,
     total: unanalyzedGames.length,
     message: "Analysis started in background",
+    retention: !isPremium ? {
+      current: existingAnalysesCount,
+      limit: MAX_FREE_ANALYSES,
+      afterJob: existingAnalysesCount + unanalyzedGames.length,
+    } : null,
   });
 
   } catch (err) {
@@ -267,13 +330,20 @@ export async function POST() {
   }
 }
 
+// Result from position evaluation
+interface EvalResult {
+  eval: number;
+  bestMove: string;
+  topMoves: TopMove[];
+}
+
 // Call Lambda to evaluate a position
-async function evaluatePosition(fen: string): Promise<{ eval: number; bestMove: string } | null> {
+async function evaluatePosition(fen: string, depth: number): Promise<EvalResult | null> {
   try {
     const response = await fetch(LAMBDA_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fen, depth: ANALYSIS_DEPTH }),
+      body: JSON.stringify({ fen, depth, multipv: 3 }),
     });
 
     if (!response.ok) return null;
@@ -281,12 +351,23 @@ async function evaluatePosition(fen: string): Promise<{ eval: number; bestMove: 
     const data = await response.json();
     if (!data.lines || data.lines.length === 0) return null;
 
-    const line = data.lines[0];
-    return {
-      eval: line.score.mate !== undefined
+    const primaryLine = data.lines[0];
+    const primaryEval = primaryLine.score.mate !== undefined
+      ? (primaryLine.score.mate > 0 ? 10000 : -10000)
+      : primaryLine.score.cp;
+
+    const topMoves: TopMove[] = data.lines.map((line: { score: { mate?: number; cp?: number }; pv?: string[] }) => ({
+      move: line.pv?.[0] || "",
+      score: line.score.mate !== undefined
         ? (line.score.mate > 0 ? 10000 : -10000)
-        : line.score.cp,
-      bestMove: line.pv?.[0] || "",
+        : line.score.cp ?? 0,
+      pv: line.pv || [],
+    }));
+
+    return {
+      eval: primaryEval,
+      bestMove: topMoves[0]?.move || "",
+      topMoves,
     };
   } catch (error) {
     console.error("Lambda evaluation error:", error);
@@ -300,7 +381,8 @@ async function analyzeGame(
   userColor: string | null,
   threshold: number,
   supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string
+  userId: string,
+  depth: number
 ): Promise<Blunder[]> {
   const blunders: Blunder[] = [];
   const chess = new Chess();
@@ -333,7 +415,7 @@ async function analyzeGame(
       const fenBefore = chess.fen();
 
       // Evaluate position before user's move
-      const evalBefore = await evaluatePosition(fenBefore);
+      const evalBefore = await evaluatePosition(fenBefore, depth);
 
       // Track engine usage
       await supabase.rpc("increment_engine_usage", { p_user_id: userId });
@@ -346,7 +428,7 @@ async function analyzeGame(
         const fenAfter = chess.fen();
 
         // Evaluate position after user's move
-        const evalAfter = await evaluatePosition(fenAfter);
+        const evalAfter = await evaluatePosition(fenAfter, depth);
         await supabase.rpc("increment_engine_usage", { p_user_id: userId });
 
         if (evalAfter) {
@@ -363,6 +445,7 @@ async function analyzeGame(
               fen: fenBefore,
               move_played: move.san,
               best_move: evalBefore.bestMove,
+              top_moves: evalBefore.topMoves,
               eval_before: evalBeforeNorm,
               eval_after: evalAfterNorm,
               eval_drop: evalDrop,

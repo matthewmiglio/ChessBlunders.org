@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { analysisId, blunderIndex, solved } = await request.json();
+    const { analysisId, blunderIndex, solved, movePlayed, moveRank } = await request.json();
 
     if (!analysisId || blunderIndex === undefined || solved === undefined) {
       return NextResponse.json(
@@ -58,6 +58,8 @@ export async function POST(request: NextRequest) {
         p_analysis_id: analysisId,
         p_blunder_index: blunderIndex,
         p_solved: solved,
+        p_move_played: movePlayed || null,
+        p_move_rank: moveRank || null,
       }
     );
 

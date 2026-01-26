@@ -29,7 +29,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#09090b] text-gray-200 min-h-screen`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#141414] text-[#f5f5f5] min-h-screen`}
       >
         <Providers>
           <AnalyticsTracker />

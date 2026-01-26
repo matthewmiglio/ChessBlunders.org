@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
+import { checkPremiumAccess } from "@/lib/premium";
+
+const MAX_FREE_GAMES = 100;
+const MAX_PREMIUM_GAMES = 1000;
 
 // GET /api/games - Fetch user's games
 export async function GET(request: NextRequest) {
@@ -52,100 +56,94 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { months } = await request.json();
+    const { count } = await request.json();
 
-    // Generate list of year/month combinations to fetch
-    const monthsToFetch: { year: number; month: number }[] = [];
-    const now = new Date();
+    // Check premium status for game limits
+    const isPremium = await checkPremiumAccess();
 
-    // For week filter, we'll need to filter games after fetching
-    const weekCutoff = months === "week" ? new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) : null;
+    // Determine the game limit (capped for all users)
+    const requestedCount = parseInt(count) || 50;
+    const maxAllowed = isPremium ? MAX_PREMIUM_GAMES : MAX_FREE_GAMES;
+    const gameLimit = Math.min(requestedCount, maxAllowed);
 
-    if (months === "all") {
-      // Fetch archives list from Chess.com
-      const archivesUrl = `https://api.chess.com/pub/player/${profile.chess_username}/games/archives`;
-      const archivesRes = await fetch(archivesUrl, {
-        headers: { "User-Agent": "ChessBlunders.org/1.0" },
-      });
-      if (archivesRes.ok) {
-        const archivesData = await archivesRes.json();
-        for (const url of archivesData.archives || []) {
-          const match = url.match(/\/(\d{4})\/(\d{2})$/);
-          if (match) {
-            monthsToFetch.push({ year: parseInt(match[1]), month: parseInt(match[2]) });
-          }
-        }
-      }
-    } else if (months === "week") {
-      // Fetch current month, and previous month if we're in the first week
-      monthsToFetch.push({ year: now.getFullYear(), month: now.getMonth() + 1 });
-      if (now.getDate() <= 7) {
-        const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        monthsToFetch.push({ year: prevMonth.getFullYear(), month: prevMonth.getMonth() + 1 });
-      }
-    } else {
-      const numMonths = parseInt(months) || 1;
-      for (let i = 0; i < numMonths; i++) {
-        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        monthsToFetch.push({ year: date.getFullYear(), month: date.getMonth() + 1 });
-      }
+    // Get archives list (sorted newest to oldest)
+    const archivesUrl = `https://api.chess.com/pub/player/${profile.chess_username}/games/archives`;
+    const archivesRes = await fetch(archivesUrl, {
+      headers: { "User-Agent": "ChessBlunders.org/1.0" },
+    });
+
+    if (!archivesRes.ok) {
+      return NextResponse.json(
+        { error: "Failed to fetch game archives from Chess.com" },
+        { status: 502 }
+      );
     }
 
-    let totalGames = 0;
-    let totalImported = 0;
+    const archivesData = await archivesRes.json();
+    const archives: string[] = archivesData.archives || [];
 
-    // Fetch games for each month
-    for (const { year, month } of monthsToFetch) {
-      const chessComUrl = `https://api.chess.com/pub/player/${profile.chess_username}/games/${year}/${month.toString().padStart(2, "0")}`;
-      const response = await fetch(chessComUrl, {
+    // Reverse to process newest months first
+    archives.reverse();
+
+    // Collect games until we hit the limit
+    const allGames: any[] = [];
+
+    for (const archiveUrl of archives) {
+      if (allGames.length >= gameLimit) break;
+
+      const response = await fetch(archiveUrl, {
         headers: { "User-Agent": "ChessBlunders.org/1.0" },
       });
 
       if (!response.ok) continue;
 
       const data = await response.json();
-      let games = data.games || [];
+      const games = data.games || [];
 
-      // Filter to last week if needed
-      if (weekCutoff) {
-        games = games.filter((game: any) => new Date(game.end_time * 1000) >= weekCutoff);
+      // Sort by end_time descending (newest first) and add to collection
+      games.sort((a: any, b: any) => b.end_time - a.end_time);
+
+      for (const game of games) {
+        if (allGames.length >= gameLimit) break;
+        allGames.push(game);
       }
+    }
 
-      totalGames += games.length;
+    // Transform games for our database
+    const transformedGames = allGames.map((game: any) => {
+      const isWhite =
+        game.white?.username?.toLowerCase() ===
+        profile.chess_username?.toLowerCase();
+      return {
+        chess_game_id: game.uuid || game.url.split("/").pop(),
+        pgn: game.pgn,
+        opponent: isWhite ? game.black?.username : game.white?.username,
+        user_color: isWhite ? "white" : "black",
+        time_class: game.time_class,
+        rated: game.rated,
+        result: isWhite ? game.white?.result : game.black?.result,
+        played_at: new Date(game.end_time * 1000).toISOString(),
+      };
+    });
 
-      if (games.length === 0) continue;
-
-      // Transform games for our database
-      const transformedGames = games.map((game: any) => {
-        const isWhite =
-          game.white?.username?.toLowerCase() ===
-          profile.chess_username?.toLowerCase();
-        return {
-          chess_game_id: game.uuid || game.url.split("/").pop(),
-          pgn: game.pgn,
-          opponent: isWhite ? game.black?.username : game.white?.username,
-          user_color: isWhite ? "white" : "black",
-          time_class: game.time_class,
-          rated: game.rated,
-          result: isWhite ? game.white?.result : game.black?.result,
-          played_at: new Date(game.end_time * 1000).toISOString(),
-        };
-      });
-
-      // Bulk insert games using RPC
+    // Bulk insert games using RPC
+    let totalImported = 0;
+    if (transformedGames.length > 0) {
       const { data: insertedCount, error } = await supabase.rpc(
         "bulk_insert_games",
         { p_games: transformedGames }
       );
 
       if (!error && insertedCount) {
-        totalImported += insertedCount;
+        totalImported = insertedCount;
       }
     }
 
     return NextResponse.json({
       imported: totalImported,
-      total: totalGames,
+      total: allGames.length,
+      limited: !isPremium && requestedCount > MAX_FREE_GAMES,
+      maxFreeGames: MAX_FREE_GAMES,
     });
   } catch (error) {
     console.error("Error importing games:", error);

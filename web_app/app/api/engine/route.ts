@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
+import { checkPremiumAccess } from "@/lib/premium";
 
 const ENGINE_API_URL = process.env.STOCKFISH_API_URL!;
 const DAILY_LIMIT = parseInt(process.env.ENGINE_DAILY_LIMIT || "100");
+const MAX_FREE_DEPTH = 12;
+const MAX_PREMIUM_DEPTH = 25;
 
 // POST /api/engine - Analyze a position with Stockfish
 export async function POST(request: NextRequest) {
@@ -35,7 +38,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { fen, depth = 20, multipv = 1 } = body;
+    const { fen, depth = 12, multipv = 1 } = body;
 
     if (!fen) {
       return NextResponse.json(
@@ -44,13 +47,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check premium status for depth limits
+    const isPremium = await checkPremiumAccess();
+    const maxDepth = isPremium ? MAX_PREMIUM_DEPTH : MAX_FREE_DEPTH;
+    const effectiveDepth = Math.min(depth, maxDepth);
+
     // Call our Stockfish Lambda
     const engineResponse = await fetch(ENGINE_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ fen, depth, multipv }),
+      body: JSON.stringify({ fen, depth: effectiveDepth, multipv }),
     });
 
     if (!engineResponse.ok) {

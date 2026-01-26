@@ -3,9 +3,14 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Analysis, Blunder } from "@/lib/supabase";
+import { Blunder } from "@/lib/supabase";
+import { PuzzleFilters, FilterCounts } from "@/lib/puzzle-filters";
 import { Chess } from "chess.js";
 import ChessBoard from "@/components/ChessBoard";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { StatCard } from "@/components/StatCard";
+import { FilterBar } from "@/components/FilterBar";
+import { Puzzle } from "@/app/api/practice/puzzles/route";
 
 interface UserStats {
   total_games: number;
@@ -14,6 +19,8 @@ interface UserStats {
   solved_blunders: number;
   total_attempts: number;
 }
+
+const FILTER_STORAGE_KEY = "chessblunders_practice_filters";
 
 // Convert SAN move to UCI format using a chess position
 function sanToUci(fen: string, san: string): string | null {
@@ -29,6 +36,58 @@ function sanToUci(fen: string, san: string): string | null {
   return null;
 }
 
+// Convert UCI move to SAN format using a chess position
+function uciToSan(fen: string, uci: string): string | null {
+  try {
+    const game = new Chess(fen);
+    const from = uci.slice(0, 2);
+    const to = uci.slice(2, 4);
+    const promotion = uci.length > 4 ? uci[4] : undefined;
+    const move = game.move({ from, to, promotion });
+    if (move) {
+      return move.san;
+    }
+  } catch {
+    console.warn("Failed to convert UCI to SAN:", uci);
+  }
+  return null;
+}
+
+// Type for move rank (1 = best, 2 = second best, 3 = third best, null = not in top 3)
+type MoveRank = 1 | 2 | 3 | null;
+
+// Check user's move against top 3 moves
+function checkMoveRank(userMoveUci: string, blunder: Blunder): MoveRank {
+  // Handle old blunders without top_moves
+  if (!blunder.top_moves || blunder.top_moves.length === 0) {
+    // Convert best_move from SAN to UCI for comparison
+    const bestMoveUci = sanToUci(blunder.fen, blunder.best_move);
+    return userMoveUci === bestMoveUci ? 1 : null;
+  }
+
+  // Check against all top moves
+  for (let i = 0; i < blunder.top_moves.length; i++) {
+    if (userMoveUci === blunder.top_moves[i].move) {
+      return (i + 1) as MoveRank;
+    }
+  }
+  return null;
+}
+
+// Get feedback based on move rank
+function getMoveRankFeedback(rank: MoveRank, blunder: Blunder): { message: string; isCorrect: boolean } {
+  switch (rank) {
+    case 1:
+      return { message: "Best move! Well done.", isCorrect: true };
+    case 2:
+      return { message: "That's the #2 move - good!", isCorrect: true };
+    case 3:
+      return { message: "That's the #3 move - acceptable.", isCorrect: true };
+    default:
+      return { message: `Incorrect. The best move was ${blunder.best_move}`, isCorrect: false };
+  }
+}
+
 // Get player side from FEN (whose turn it is)
 function getPlayerSide(fen: string): "w" | "b" {
   const parts = fen.split(" ");
@@ -42,7 +101,8 @@ function PracticeContent() {
   const analysisId = searchParams.get("analysisId");
   const blunderIndexParam = searchParams.get("blunderIndex");
 
-  const [analyses, setAnalyses] = useState<Analysis[]>([]);
+  const [puzzles, setPuzzles] = useState<Puzzle[]>([]);
+  const [currentPuzzle, setCurrentPuzzle] = useState<Puzzle | null>(null);
   const [currentBlunder, setCurrentBlunder] = useState<Blunder | null>(null);
   const [currentAnalysisId, setCurrentAnalysisId] = useState<string | null>(
     null
@@ -52,11 +112,30 @@ function PracticeContent() {
     correct: boolean;
     message: string;
     userMove?: string;
+    rank?: MoveRank;
   } | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [puzzlesLoading, setPuzzlesLoading] = useState(true);
   const [expectedMoveUci, setExpectedMoveUci] = useState<string>("");
   const [showHint, setShowHint] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Filter state
+  const [filters, setFilters] = useState<PuzzleFilters>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem(FILTER_STORAGE_KEY);
+      if (stored) {
+        try {
+          return JSON.parse(stored);
+        } catch {
+          return {};
+        }
+      }
+    }
+    return {};
+  });
+  const [filterCounts, setFilterCounts] = useState<FilterCounts | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -66,21 +145,37 @@ function PracticeContent() {
 
   useEffect(() => {
     if (user) {
-      fetchData();
+      fetchStats();
     }
   }, [user]);
 
+  // Persist filters to localStorage
   useEffect(() => {
-    if (analysisId && blunderIndexParam !== null && analyses.length > 0) {
-      const analysis = analyses.find((a) => a.id === analysisId);
-      if (analysis && analysis.blunders.length > 0) {
-        const idx = parseInt(blunderIndexParam);
-        setCurrentAnalysisId(analysisId);
-        setCurrentBlunderIndex(idx);
-        setCurrentBlunder(analysis.blunders[idx]);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters));
+    }
+  }, [filters]);
+
+  // Fetch puzzles when filters change
+  useEffect(() => {
+    if (user) {
+      fetchPuzzles();
+    }
+  }, [user, filters]);
+
+  useEffect(() => {
+    if (analysisId && blunderIndexParam !== null && puzzles.length > 0) {
+      const puzzle = puzzles.find(
+        (p) => p.analysisId === analysisId && p.blunderIndex === parseInt(blunderIndexParam)
+      );
+      if (puzzle) {
+        setCurrentPuzzle(puzzle);
+        setCurrentAnalysisId(puzzle.analysisId);
+        setCurrentBlunderIndex(puzzle.blunderIndex);
+        setCurrentBlunder(puzzle.blunder);
       }
     }
-  }, [analysisId, blunderIndexParam, analyses]);
+  }, [analysisId, blunderIndexParam, puzzles]);
 
   // Convert best_move to UCI when blunder changes
   useEffect(() => {
@@ -91,63 +186,79 @@ function PracticeContent() {
     }
   }, [currentBlunder]);
 
-  const fetchData = async () => {
+  const fetchStats = async () => {
     try {
-      const [analysesRes, userRes] = await Promise.all([
-        fetch("/api/analysis"),
-        fetch("/api/user"),
-      ]);
-
-      const analysesData = await analysesRes.json();
+      const userRes = await fetch("/api/user");
       const userData = await userRes.json();
-
-      setAnalyses(analysesData.analyses || []);
       setStats(userData.stats);
-
-      // If no specific blunder requested, pick a random one
-      if (!analysisId && analysesData.analyses?.length > 0) {
-        pickRandomBlunder(analysesData.analyses);
-      }
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Error fetching stats:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const pickRandomBlunder = useCallback((availableAnalyses: Analysis[]) => {
-    const analysesWithBlunders = availableAnalyses.filter(
-      (a) => a.blunders.length > 0
-    );
-    if (analysesWithBlunders.length === 0) return;
+  const fetchPuzzles = async () => {
+    setPuzzlesLoading(true);
+    try {
+      // Build query string from filters
+      const params = new URLSearchParams();
+      if (filters.phase) params.set("phase", filters.phase);
+      if (filters.severity) params.set("severity", filters.severity);
+      if (filters.timeControl) params.set("timeControl", filters.timeControl);
+      if (filters.color) params.set("color", filters.color);
+      if (filters.result) params.set("result", filters.result);
+      if (filters.pieceType) params.set("pieceType", filters.pieceType);
+      if (filters.dateRange) params.set("dateRange", filters.dateRange);
+      if (filters.openingFamily) params.set("openingFamily", filters.openingFamily);
+      if (filters.solved !== undefined) params.set("solved", String(filters.solved));
 
-    const randomAnalysis =
-      analysesWithBlunders[
-        Math.floor(Math.random() * analysesWithBlunders.length)
-      ];
-    const randomIndex = Math.floor(
-      Math.random() * randomAnalysis.blunders.length
-    );
+      const res = await fetch(`/api/practice/puzzles?${params.toString()}`);
+      const data = await res.json();
 
-    setCurrentAnalysisId(randomAnalysis.id);
-    setCurrentBlunderIndex(randomIndex);
-    setCurrentBlunder(randomAnalysis.blunders[randomIndex]);
+      setPuzzles(data.puzzles || []);
+      setFilterCounts(data.counts || null);
+
+      // If no specific puzzle requested, pick a random one
+      if (!analysisId && data.puzzles?.length > 0 && !currentPuzzle) {
+        pickRandomPuzzle(data.puzzles);
+      }
+    } catch (error) {
+      console.error("Error fetching puzzles:", error);
+    } finally {
+      setPuzzlesLoading(false);
+    }
+  };
+
+  const pickRandomPuzzle = useCallback((availablePuzzles: Puzzle[]) => {
+    if (availablePuzzles.length === 0) return;
+
+    const randomPuzzle =
+      availablePuzzles[Math.floor(Math.random() * availablePuzzles.length)];
+
+    setCurrentPuzzle(randomPuzzle);
+    setCurrentAnalysisId(randomPuzzle.analysisId);
+    setCurrentBlunderIndex(randomPuzzle.blunderIndex);
+    setCurrentBlunder(randomPuzzle.blunder);
     setFeedback(null);
     setShowHint(false);
   }, []);
 
-  const handleMoveResult = async (correct: boolean, userMoveUci: string) => {
+  const handleMoveResult = async (_correct: boolean, userMoveUci: string) => {
     if (!currentBlunder || !currentAnalysisId) return;
 
+    // Check move against top 3 moves
+    const rank = checkMoveRank(userMoveUci, currentBlunder);
+    const { message, isCorrect } = getMoveRankFeedback(rank, currentBlunder);
+
     setFeedback({
-      correct,
-      message: correct
-        ? "Correct! That's the best move."
-        : `Incorrect. The best move was ${currentBlunder.best_move}`,
+      correct: isCorrect,
+      message,
       userMove: userMoveUci,
+      rank,
     });
 
-    // Record attempt
+    // Record attempt with move details for granular tracking
     try {
       await fetch("/api/progress", {
         method: "POST",
@@ -155,7 +266,9 @@ function PracticeContent() {
         body: JSON.stringify({
           analysisId: currentAnalysisId,
           blunderIndex: currentBlunderIndex,
-          solved: correct,
+          solved: isCorrect,
+          movePlayed: userMoveUci,
+          moveRank: rank,
         }),
       });
 
@@ -168,8 +281,8 @@ function PracticeContent() {
     }
   };
 
-  const nextBlunder = () => {
-    pickRandomBlunder(analyses);
+  const nextPuzzle = () => {
+    pickRandomPuzzle(puzzles);
   };
 
   const handleShowHint = () => {
@@ -177,24 +290,16 @@ function PracticeContent() {
   };
 
   if (authLoading || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="flex items-center gap-3">
-          <div className="w-5 h-5 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
-          <p className="text-slate-400">Loading...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
-  const analysesWithBlunders = analyses.filter((a) => a.blunders.length > 0);
-
-  if (analysesWithBlunders.length === 0) {
+  // Show empty state if no puzzles after initial load
+  if (!puzzlesLoading && puzzles.length === 0 && filterCounts?.all === 0) {
     return (
       <div className="text-center py-16">
-        <div className="w-20 h-20 rounded-2xl bg-slate-800 flex items-center justify-center mx-auto mb-6">
+        <div className="w-20 h-20 rounded-lg bg-[#3c3c3c] flex items-center justify-center mx-auto mb-6">
           <svg
-            className="w-10 h-10 text-slate-500"
+            className="w-10 h-10 text-[#b4b4b4]"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -207,16 +312,16 @@ function PracticeContent() {
             />
           </svg>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white mb-4">
+        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#f5f5f5] mb-4">
           Practice Mode
         </h1>
-        <p className="text-slate-400 mb-8 max-w-md mx-auto">
+        <p className="text-[#b4b4b4] mb-8 max-w-md mx-auto">
           No blunders to practice yet. Analyze some games first to find
           positions to train on.
         </p>
         <button
           onClick={() => router.push("/games")}
-          className="inline-flex items-center justify-center rounded-xl bg-gradient-to-b from-sky-400 to-sky-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/25 hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 transition-all"
+          className="inline-flex items-center justify-center rounded-md bg-[#ebebeb] px-6 py-3 text-sm font-medium text-[#202020] shadow-sm hover:bg-[#ebebeb]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8c8c8c] transition-all"
         >
           Go to Games
         </button>
@@ -227,64 +332,131 @@ function PracticeContent() {
   const playerSide = currentBlunder ? getPlayerSide(currentBlunder.fen) : "w";
   const hintSquare = showHint && expectedMoveUci ? expectedMoveUci.slice(2, 4) : null;
 
+  const activeFilterCount = Object.values(filters).filter(
+    (v) => v !== undefined
+  ).length;
+
   return (
     <div className="max-w-6xl mx-auto">
-      <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white mb-8">
-        Practice Mode
-      </h1>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#f5f5f5]">
+          Practice Mode
+        </h1>
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            showFilters || activeFilterCount > 0
+              ? "bg-[#8a2be2] text-white"
+              : "bg-[#3c3c3c] text-[#b4b4b4] hover:bg-[#4c4c4c]"
+          }`}
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+            />
+          </svg>
+          Filters
+          {activeFilterCount > 0 && (
+            <span className="bg-white/20 px-1.5 py-0.5 rounded text-xs">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
+      </div>
 
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-5 text-center">
-            <p className="text-2xl font-semibold text-white">
-              {stats.total_blunders}
-            </p>
-            <p className="text-xs text-slate-400 uppercase tracking-wider mt-1">
-              Total Blunders
-            </p>
-          </div>
-          <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-5 text-center">
-            <p className="text-2xl font-semibold text-emerald-400">
-              {stats.solved_blunders}
-            </p>
-            <p className="text-xs text-slate-400 uppercase tracking-wider mt-1">
-              Solved
-            </p>
-          </div>
-          <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-5 text-center">
-            <p className="text-2xl font-semibold text-white">
-              {stats.total_attempts}
-            </p>
-            <p className="text-xs text-slate-400 uppercase tracking-wider mt-1">
-              Total Attempts
-            </p>
-          </div>
-          <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-5 text-center">
-            <p className="text-2xl font-semibold text-sky-400">
-              {stats.total_attempts > 0
-                ? Math.round(
-                    (stats.solved_blunders / stats.total_attempts) * 100
-                  )
-                : 0}
-              %
-            </p>
-            <p className="text-xs text-slate-400 uppercase tracking-wider mt-1">
-              Success Rate
-            </p>
-          </div>
+      {/* Filter Bar */}
+      {showFilters && (
+        <div className="mb-6">
+          <FilterBar
+            filters={filters}
+            onChange={setFilters}
+            counts={filterCounts}
+            loading={puzzlesLoading}
+          />
         </div>
       )}
 
-      {currentBlunder && (
+      {/* Puzzle count summary */}
+      {filterCounts && (
+        <div className="mb-6 text-sm text-[#b4b4b4]">
+          {activeFilterCount > 0 ? (
+            <span>
+              Showing <span className="text-[#f5f5f5] font-medium">{puzzles.length}</span> of{" "}
+              <span className="text-[#f5f5f5] font-medium">{filterCounts.all}</span> puzzles
+            </span>
+          ) : (
+            <span>
+              <span className="text-[#f5f5f5] font-medium">{filterCounts.all}</span> puzzles available
+            </span>
+          )}
+        </div>
+      )}
+
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <StatCard label="Total Blunders" value={stats.total_blunders} centered />
+          <StatCard label="Solved" value={stats.solved_blunders} valueColor="text-[#18be5d]" centered />
+          <StatCard label="Total Attempts" value={stats.total_attempts} centered />
+          <StatCard
+            label="Success Rate"
+            value={`${stats.total_attempts > 0 ? Math.round((stats.solved_blunders / stats.total_attempts) * 100) : 0}%`}
+            valueColor="text-[#f44336]"
+            centered
+          />
+        </div>
+      )}
+
+      {/* No matching puzzles message */}
+      {!puzzlesLoading && puzzles.length === 0 && filterCounts && filterCounts.all > 0 && (
+        <div className="bg-[#202020] border border-white/10 rounded-lg p-8 text-center">
+          <div className="w-16 h-16 rounded-lg bg-[#3c3c3c] flex items-center justify-center mx-auto mb-4">
+            <svg
+              className="w-8 h-8 text-[#b4b4b4]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+              />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-[#f5f5f5] mb-2">
+            No puzzles match your filters
+          </h3>
+          <p className="text-[#b4b4b4] mb-4">
+            Try adjusting your filter criteria to see more puzzles.
+          </p>
+          <button
+            onClick={() => setFilters({})}
+            className="inline-flex items-center justify-center rounded-md bg-[#8a2be2] px-4 py-2 text-sm font-medium text-white hover:bg-[#8a2be2]/90 transition-colors"
+          >
+            Clear All Filters
+          </button>
+        </div>
+      )}
+
+      {currentBlunder && puzzles.length > 0 && (
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Left: Chess Board */}
           <div className="flex-1 lg:max-w-[60%]">
-            <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-6">
+            <div className="bg-[#202020] border border-white/10 rounded-lg p-6">
               <div className="text-center mb-4">
-                <h2 className="text-xl font-semibold text-white">
+                <h2 className="text-xl font-semibold text-[#f5f5f5]">
                   {playerSide === "w" ? "White" : "Black"} to move
                 </h2>
-                <p className="text-slate-400 text-sm mt-1">
+                <p className="text-[#b4b4b4] text-sm mt-1">
                   Find the best move
                 </p>
               </div>
@@ -302,36 +474,69 @@ function PracticeContent() {
 
           {/* Right: Info Panel */}
           <div className="flex-1 lg:max-w-[40%]">
-            <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-6 space-y-6">
+            <div className="bg-[#202020] border border-white/10 rounded-lg p-6 space-y-6">
+              {/* Puzzle Context */}
+              {currentPuzzle?.game && (
+                <div>
+                  <h3 className="text-sm font-medium text-[#b4b4b4] uppercase tracking-wider mb-3">
+                    Game Info
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="px-2 py-1 text-xs rounded bg-[#3c3c3c] text-[#b4b4b4]">
+                      {currentPuzzle.game.time_class || "Unknown"}
+                    </span>
+                    <span className="px-2 py-1 text-xs rounded bg-[#3c3c3c] text-[#b4b4b4]">
+                      {currentPuzzle.game.user_color === "white" ? "White" : "Black"}
+                    </span>
+                    <span className={`px-2 py-1 text-xs rounded ${
+                      currentPuzzle.resultCategory === "win"
+                        ? "bg-[#18be5d]/20 text-[#18be5d]"
+                        : currentPuzzle.resultCategory === "loss"
+                        ? "bg-[#f44336]/20 text-[#f44336]"
+                        : "bg-[#808080]/20 text-[#808080]"
+                    }`}>
+                      {currentPuzzle.resultCategory === "win"
+                        ? "Won"
+                        : currentPuzzle.resultCategory === "loss"
+                        ? "Lost"
+                        : "Draw"}
+                    </span>
+                    <span className="px-2 py-1 text-xs rounded bg-[#3c3c3c] text-[#b4b4b4]">
+                      Move {currentBlunder.move_number}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Blunder Info */}
               <div>
-                <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider mb-3">
+                <h3 className="text-sm font-medium text-[#b4b4b4] uppercase tracking-wider mb-3">
                   Position Info
                 </h3>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center py-2 border-b border-white/5">
-                    <span className="text-slate-400">You played</span>
-                    <span className="font-mono text-red-400">
+                    <span className="text-[#b4b4b4]">You played</span>
+                    <span className="font-mono text-[#f44336]">
                       {currentBlunder.move_played}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-white/5">
-                    <span className="text-slate-400">Eval before</span>
-                    <span className="font-mono text-slate-300">
+                    <span className="text-[#b4b4b4]">Eval before</span>
+                    <span className="font-mono text-[#f5f5f5]">
                       {currentBlunder.eval_before > 0 ? "+" : ""}
                       {(currentBlunder.eval_before / 100).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-white/5">
-                    <span className="text-slate-400">Eval after</span>
-                    <span className="font-mono text-red-400">
+                    <span className="text-[#b4b4b4]">Eval after</span>
+                    <span className="font-mono text-[#f44336]">
                       {currentBlunder.eval_after > 0 ? "+" : ""}
                       {(currentBlunder.eval_after / 100).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2">
-                    <span className="text-slate-400">Eval drop</span>
-                    <span className="font-mono text-red-400">
+                    <span className="text-[#b4b4b4]">Eval drop</span>
+                    <span className="font-mono text-[#f44336]">
                       -{currentBlunder.eval_drop} cp
                     </span>
                   </div>
@@ -342,7 +547,7 @@ function PracticeContent() {
               {!feedback && !showHint && (
                 <button
                   onClick={handleShowHint}
-                  className="w-full py-3 px-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors text-sm font-medium"
+                  className="w-full py-3 px-4 rounded-md border border-[#ff6f00]/30 bg-[#ff6f00]/10 text-[#ff6f00] hover:bg-[#ff6f00]/20 transition-colors text-sm font-medium"
                 >
                   Show Hint
                 </button>
@@ -352,10 +557,14 @@ function PracticeContent() {
               {feedback && (
                 <div className="space-y-4">
                   <div
-                    className={`p-5 rounded-xl ${
-                      feedback.correct
-                        ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"
-                        : "bg-red-500/10 border border-red-500/30 text-red-400"
+                    className={`p-5 rounded-md ${
+                      feedback.rank === 1
+                        ? "bg-[#18be5d]/10 border border-[#18be5d]/30 text-[#18be5d]"
+                        : feedback.rank === 2
+                        ? "bg-[#3b82f6]/10 border border-[#3b82f6]/30 text-[#3b82f6]"
+                        : feedback.rank === 3
+                        ? "bg-[#eab308]/10 border border-[#eab308]/30 text-[#eab308]"
+                        : "bg-[#f44336]/10 border border-[#f44336]/30 text-[#f44336]"
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-2">
@@ -389,17 +598,41 @@ function PracticeContent() {
                         </svg>
                       )}
                       <span className="font-semibold">
-                        {feedback.correct ? "Correct!" : "Incorrect"}
+                        {feedback.rank === 1 ? "Best Move!" :
+                         feedback.rank === 2 ? "#2 Move!" :
+                         feedback.rank === 3 ? "#3 Move!" : "Incorrect"}
                       </span>
                     </div>
                     <p className="text-sm opacity-90">{feedback.message}</p>
                   </div>
 
+                  {/* Show all top moves after solving */}
+                  {feedback.correct && currentBlunder?.top_moves && currentBlunder.top_moves.length > 0 && (
+                    <div className="bg-[#2a2a2a] border border-white/10 p-4 rounded-md">
+                      <p className="text-sm text-[#b4b4b4] mb-3">Top moves in this position:</p>
+                      {currentBlunder.top_moves.map((m, i) => (
+                        <div key={i} className="flex items-center gap-3 py-2 border-b border-white/5 last:border-0">
+                          <span className={`w-6 text-sm font-medium ${
+                            i === 0 ? "text-[#18be5d]" :
+                            i === 1 ? "text-[#3b82f6]" :
+                            "text-[#eab308]"
+                          }`}>#{i + 1}</span>
+                          <span className="font-mono font-bold text-[#f5f5f5]">
+                            {uciToSan(currentBlunder.fen, m.move) || m.move}
+                          </span>
+                          <span className="text-sm text-[#b4b4b4]">
+                            ({m.score > 0 ? '+' : ''}{(m.score / 100).toFixed(2)})
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <button
-                    onClick={nextBlunder}
-                    className="w-full inline-flex items-center justify-center rounded-xl bg-gradient-to-b from-violet-400 to-violet-500 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/25 hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 transition-all"
+                    onClick={nextPuzzle}
+                    className="w-full inline-flex items-center justify-center rounded-md bg-[#8a2be2] px-6 py-3.5 text-sm font-medium text-white shadow-sm hover:bg-[#8a2be2]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8a2be2] transition-all"
                   >
-                    Next Blunder
+                    Next Puzzle
                   </button>
                 </div>
               )}
@@ -413,16 +646,7 @@ function PracticeContent() {
 
 export default function PracticePage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="flex items-center gap-3">
-            <div className="w-5 h-5 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
-            <p className="text-slate-400">Loading...</p>
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<LoadingSpinner />}>
       <PracticeContent />
     </Suspense>
   );
