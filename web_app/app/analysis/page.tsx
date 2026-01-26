@@ -371,18 +371,18 @@ function AnalysisContent() {
       )}
 
       <div className={`grid gap-4 sm:gap-6 mb-8 ${!stats.isPremium ? 'grid-cols-3' : 'grid-cols-2'}`}>
-        <StatCard label="Total Games" value={stats.totalGames} />
+        <StatCard label="Total Games" value={analyzing ? analyzeProgress.total : stats.totalGames} />
         <StatCard
           label="Analyzed"
-          value={stats.analyzedGames}
-          sublabel={`${stats.totalGames > 0 ? Math.round((stats.analyzedGames / stats.totalGames) * 100) : 0}%`}
+          value={analyzing ? analyzeProgress.current : stats.analyzedGames}
+          sublabel={`${(analyzing ? analyzeProgress.total : stats.totalGames) > 0 ? Math.round(((analyzing ? analyzeProgress.current : stats.analyzedGames) / (analyzing ? analyzeProgress.total : stats.totalGames)) * 100) : 0}%`}
           valueColor="text-[#18be5d]"
         />
         {!stats.isPremium && stats.retentionLimit && (
           <StatCard
             label="Analysis Limit"
-            value={`${stats.analyzedGames}/${stats.retentionLimit}`}
-            sublabel={retentionLimitReached ? "Limit reached" : `${stats.retentionLimit - stats.analyzedGames} remaining`}
+            value={`${analyzing ? analyzeProgress.current : stats.analyzedGames}/${stats.retentionLimit}`}
+            sublabel={retentionLimitReached ? "Limit reached" : `${stats.retentionLimit - (analyzing ? analyzeProgress.current : stats.analyzedGames)} remaining`}
             valueColor={retentionLimitReached ? "text-[#f44336]" : "text-[#ff6f00]"}
           />
         )}
