@@ -1,6 +1,8 @@
 import { supabase } from "@/lib/supabase";
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const { data, error } = await supabase.rpc("get_pageviews_by_path_all_time");
 
