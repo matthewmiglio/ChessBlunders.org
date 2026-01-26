@@ -35,6 +35,11 @@ export default function ProgressPage() {
       const res = await fetch("/api/stats");
       const data = await res.json();
 
+      console.log("[progress] Stats response:", data);
+      console.log("[progress] Result counts from DB:", data._debug?.resultCounts);
+      console.log("[progress] Sample games:", data._debug?.sampleGames);
+      console.log("[progress] games_won:", data.stats?.games_won, "games_lost:", data.stats?.games_lost, "games_drawn:", data.stats?.games_drawn);
+
       if (!res.ok) {
         setError(data.error || "Failed to load stats");
         return;
@@ -112,7 +117,7 @@ export default function ProgressPage() {
   return (
     <div className="max-w-6xl mx-auto">
       <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#f5f5f5] mb-8">
-        Your Progress
+        Your Practice Progress
       </h1>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

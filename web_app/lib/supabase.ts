@@ -12,6 +12,8 @@ export interface Profile {
   chess_username: string | null;
   created_at: string;
   updated_at: string;
+  stripe_subscription_status?: string | null;
+  subscription_period_end?: string | null;
 }
 
 export interface Game {
@@ -52,6 +54,7 @@ export interface Analysis {
   blunders: Blunder[];
   threshold_cp: number;
   analyzed_at: string;
+  game?: Game;
 }
 
 export interface EngineUsage {

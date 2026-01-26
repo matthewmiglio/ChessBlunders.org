@@ -100,6 +100,7 @@ function PracticeContent() {
   const searchParams = useSearchParams();
   const analysisId = searchParams.get("analysisId");
   const blunderIndexParam = searchParams.get("blunderIndex");
+  const clearFiltersParam = searchParams.get("clearFilters");
 
   const [puzzles, setPuzzles] = useState<Puzzle[]>([]);
   const [currentPuzzle, setCurrentPuzzle] = useState<Puzzle | null>(null);
@@ -121,19 +122,20 @@ function PracticeContent() {
   const [showHint, setShowHint] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Filter state
+  // Filter state - default to showing unsolved puzzles
   const [filters, setFilters] = useState<PuzzleFilters>(() => {
+    const defaultFilters: PuzzleFilters = { solved: false };
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem(FILTER_STORAGE_KEY);
       if (stored) {
         try {
           return JSON.parse(stored);
         } catch {
-          return {};
+          return defaultFilters;
         }
       }
     }
-    return {};
+    return defaultFilters;
   });
   const [filterCounts, setFilterCounts] = useState<FilterCounts | null>(null);
 
@@ -142,6 +144,14 @@ function PracticeContent() {
       router.push("/");
     }
   }, [authLoading, user, router]);
+
+  // Clear filters when coming from analysis page with a specific puzzle
+  useEffect(() => {
+    if (clearFiltersParam === "true") {
+      setFilters({});
+      localStorage.removeItem(FILTER_STORAGE_KEY);
+    }
+  }, [clearFiltersParam]);
 
   useEffect(() => {
     if (user) {
@@ -303,7 +313,16 @@ function PracticeContent() {
   };
 
   const nextPuzzle = () => {
-    pickRandomPuzzle(puzzles);
+    // If filtering by unsolved, remove the just-solved puzzle from the array
+    if (filters.solved === false && currentPuzzle) {
+      const remainingPuzzles = puzzles.filter(
+        p => !(p.analysisId === currentPuzzle.analysisId && p.blunderIndex === currentPuzzle.blunderIndex)
+      );
+      setPuzzles(remainingPuzzles);
+      pickRandomPuzzle(remainingPuzzles);
+    } else {
+      pickRandomPuzzle(puzzles);
+    }
   };
 
   const handleShowHint = () => {

@@ -103,8 +103,12 @@ export default function Home() {
                   </div>
                   {[
                     { opponent: "Magnus2024", result: "Lost", blunders: 3, avatar: "/profile_icons/Magnus_Carlsen_in_2025.webp" },
-                    { opponent: "ChessKing99", result: "Won", blunders: 1, avatar: "/profile_icons/hikaru.webp" },
-                    { opponent: "Speedster", result: "Lost", blunders: 4, avatar: "/profile_icons/igorpic.webp" },
+                    { opponent: "HikaruFan99", result: "Won", blunders: 1, avatar: "/profile_icons/hikaru.webp" },
+                    { opponent: "GothamGuru", result: "Lost", blunders: 4, avatar: "/profile_icons/gotham.webp" },
+                    { opponent: "BotezGambit", result: "Won", blunders: 2, avatar: "/profile_icons/botez.webp" },
+                    { opponent: "CramlingQueen", result: "Draw", blunders: 1, avatar: "/profile_icons/anna.webp" },
+                    { opponent: "HansOnFire", result: "Lost", blunders: 5, avatar: "/profile_icons/hans.webp" },
+                    { opponent: "SvidlerPro", result: "Won", blunders: 0, avatar: "/profile_icons/igorpic.webp" },
                   ].map((game, i) => (
                     <div key={i} className="flex items-center gap-3 p-3 bg-[#3c3c3c]/50 rounded-lg border border-white/5">
                       <img
@@ -114,11 +118,18 @@ export default function Home() {
                       />
                       <div className="flex-1">
                         <p className="text-[#f5f5f5] text-sm font-medium">vs {game.opponent}</p>
-                        <p className="text-[#b4b4b4] text-xs">{game.result}</p>
+                        <p className={`text-xs ${
+                          game.result === "Won" ? "text-[#18be5d]" :
+                          game.result === "Lost" ? "text-[#f44336]" :
+                          "text-[#b4b4b4]"
+                        }`}>{game.result}</p>
                       </div>
                       <div className="text-right">
-                        <span className={`text-xs font-medium ${game.blunders > 2 ? "text-[#f44336]" : "text-[#ff6f00]"}`}>
-                          {game.blunders} blunders
+                        <span className={`text-xs font-medium ${
+                          game.blunders === 0 ? "text-[#18be5d]" :
+                          game.blunders > 2 ? "text-[#f44336]" : "text-[#ff6f00]"
+                        }`}>
+                          {game.blunders} blunder{game.blunders !== 1 ? "s" : ""}
                         </span>
                       </div>
                     </div>

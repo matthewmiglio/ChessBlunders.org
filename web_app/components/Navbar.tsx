@@ -2,18 +2,21 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
 
 export function Navbar() {
   const { user, profile, loading, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const isSubscribed = profile?.stripe_subscription_status === 'active' || profile?.stripe_subscription_status === 'trialing';
+
   const navLinks = [
     { href: "/games", label: "Games" },
     { href: "/analysis", label: "Analysis" },
     { href: "/practice", label: "Practice" },
     { href: "/progress", label: "Progress" },
-    { href: "/account", label: "Account" },
+    { href: "/account", label: isSubscribed ? "Subscription" : "Upgrade" },
   ];
 
   return (
@@ -22,10 +25,17 @@ export function Navbar() {
         <div className="flex items-center justify-between">
           <Link
             href="/"
-            className="text-xl font-semibold tracking-tight text-[#f5f5f5] hover:text-[#f44336] transition-colors"
+            className="flex items-center gap-2 text-xl font-semibold tracking-tight text-[#f5f5f5] hover:text-[#f44336] transition-colors"
             onClick={() => setMobileMenuOpen(false)}
           >
-            ChessBlunders.org
+            <Image
+              src="/logos/chessblundericon.png"
+              alt="ChessBlunders"
+              width={32}
+              height={32}
+              className="rounded"
+            />
+            <span className="hidden sm:inline">Chess<span className="text-[#f44336]">Blunders</span>.org</span>
           </Link>
 
           {/* Desktop Navigation */}

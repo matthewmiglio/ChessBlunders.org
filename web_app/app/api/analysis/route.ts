@@ -16,8 +16,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from("analysis")
     .select(`*, game:games(*)`)
-    .eq("user_id", user.id)
-    .order("analyzed_at", { ascending: false });
+    .eq("user_id", user.id);
 
   if (gameId) {
     query = query.eq("game_id", gameId);
@@ -29,7 +28,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ analyses });
+  // Sort by game played_at date, most recent first
+  const sortedAnalyses = (analyses || []).sort((a, b) => {
+    const dateA = a.game?.played_at ? new Date(a.game.played_at).getTime() : 0;
+    const dateB = b.game?.played_at ? new Date(b.game.played_at).getTime() : 0;
+    return dateB - dateA;
+  });
+
+  return NextResponse.json({ analyses: sortedAnalyses });
 }
 
 // POST /api/analysis - Analyze a game

@@ -94,19 +94,32 @@ function AnalysisContent() {
   const analyzeAll = async () => {
     setAnalyzing(true);
     abortRef.current = false;
+    console.log("[analyzeAll] Starting analysis...");
 
     try {
       // Fetch unanalyzed games
+      console.log("[analyzeAll] Fetching unanalyzed games...");
       const response = await fetch("/api/analysis/unanalyzed");
       const data = await response.json();
+      console.log("[analyzeAll] Unanalyzed response:", {
+        ok: response.ok,
+        total: data.total,
+        alreadyAnalyzed: data.alreadyAnalyzed,
+        gamesCount: data.games?.length,
+        limitReached: data.limitReached,
+        remainingSlots: data.remainingSlots,
+        isPremium: data.isPremium
+      });
 
       if (!response.ok) {
+        console.log("[analyzeAll] Response not OK:", data.error);
         toast.error(data.error || "Failed to fetch games");
         setAnalyzing(false);
         return;
       }
 
       if (data.limitReached) {
+        console.log("[analyzeAll] Limit reached, stopping");
         setRetentionLimitReached(true);
         toast.error("Free analysis limit reached");
         setAnalyzing(false);
@@ -114,8 +127,10 @@ function AnalysisContent() {
       }
 
       const unanalyzedGames: UnanalyzedGame[] = data.games || [];
+      console.log("[analyzeAll] Unanalyzed games IDs:", unanalyzedGames.map(g => g.id));
 
       if (unanalyzedGames.length === 0) {
+        console.log("[analyzeAll] No unanalyzed games found!");
         toast.info("All games are already analyzed!");
         setAnalyzing(false);
         return;
@@ -123,6 +138,7 @@ function AnalysisContent() {
 
       const totalToAnalyze = unanalyzedGames.length;
       const startingCount = data.alreadyAnalyzed || 0;
+      console.log("[analyzeAll] Starting count:", startingCount, "Total to analyze:", totalToAnalyze);
 
       setAnalyzeProgress({
         current: startingCount,
@@ -135,11 +151,13 @@ function AnalysisContent() {
       // Process in batches
       for (let i = 0; i < unanalyzedGames.length; i += BATCH_SIZE) {
         if (abortRef.current) {
+          console.log("[analyzeAll] Aborted by user");
           toast.info(`Analysis stopped. ${analyzed} games analyzed.`);
           break;
         }
 
         const batch = unanalyzedGames.slice(i, i + BATCH_SIZE);
+        console.log(`[analyzeAll] Processing batch ${i / BATCH_SIZE + 1}, games:`, batch.map(g => g.id));
 
         const results = await Promise.allSettled(
           batch.map(game =>
@@ -151,12 +169,21 @@ function AnalysisContent() {
           )
         );
 
+        console.log(`[analyzeAll] Batch results:`, results.map((r, idx) => ({
+          gameId: batch[idx].id,
+          status: r.status,
+          value: r.status === "fulfilled" ? r.value : null,
+          reason: r.status === "rejected" ? r.reason : null
+        })));
+
         for (const result of results) {
           if (result.status === "fulfilled" && result.value.success) {
             analyzed++;
           } else {
             failed++;
+            console.log("[analyzeAll] Failed result:", result);
             if (result.status === "fulfilled" && result.value.limitReached) {
+              console.log("[analyzeAll] Limit reached during batch!");
               setRetentionLimitReached(true);
               toast.error("Free analysis limit reached");
               abortRef.current = true;
@@ -165,6 +192,7 @@ function AnalysisContent() {
           }
         }
 
+        console.log(`[analyzeAll] After batch: analyzed=${analyzed}, failed=${failed}`);
         setAnalyzeProgress({
           current: startingCount + analyzed + failed,
           total: startingCount + totalToAnalyze
@@ -176,6 +204,7 @@ function AnalysisContent() {
         }
       }
 
+      console.log(`[analyzeAll] Finished! analyzed=${analyzed}, failed=${failed}, aborted=${abortRef.current}`);
       if (!abortRef.current) {
         toast.success(`Analysis complete! ${analyzed} games analyzed.`);
       }
@@ -185,7 +214,7 @@ function AnalysisContent() {
       await fetchStats();
 
     } catch (error) {
-      console.error("Error analyzing games:", error);
+      console.error("[analyzeAll] Error:", error);
       toast.error("Analysis failed");
     } finally {
       setAnalyzing(false);
@@ -268,7 +297,7 @@ function AnalysisContent() {
                       <button
                         onClick={() =>
                           router.push(
-                            `/practice?analysisId=${selectedAnalysis.id}&blunderIndex=${index}`
+                            `/practice?analysisId=${selectedAnalysis.id}&blunderIndex=${index}&clearFilters=true`
                           )
                         }
                         className="inline-flex items-center justify-center rounded-md bg-[#18be5d] px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-[#18be5d]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#18be5d] transition-all"
@@ -403,33 +432,103 @@ function AnalysisContent() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-4">
-          {analyses.map((analysis) => (
-            <div
-              key={analysis.id}
-              className="bg-[#202020] border border-white/10 rounded-lg p-5 cursor-pointer hover:border-white/20 hover:bg-[#3c3c3c]/30 transition-all"
-              onClick={() => setSelectedAnalysis(analysis)}
-            >
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="font-medium text-[#f5f5f5]">
-                    {new Date(analysis.analyzed_at).toLocaleDateString()}
-                  </p>
-                  <p className="text-sm text-[#b4b4b4] mt-1">
-                    <span className={analysis.blunders.length > 0 ? "text-[#ff6f00]" : "text-[#18be5d]"}>
-                      {analysis.blunders.length}
-                    </span> blunders found
-                  </p>
+        <div className="grid gap-3">
+          {analyses.map((analysis) => {
+            const game = analysis.game;
+            const isWin = game?.result === 'win';
+            const isLoss = ['resigned', 'checkmated', 'timeout', 'abandoned', 'loss'].includes(game?.result || '');
+            const isDraw = ['repetition', 'stalemate', 'agreed', 'insufficient', '50move', 'draw'].includes(game?.result || '');
+
+            return (
+              <div
+                key={analysis.id}
+                className="bg-[#202020] border border-white/10 rounded-lg p-4 cursor-pointer hover:border-white/20 hover:bg-[#3c3c3c]/30 transition-all"
+                onClick={() => setSelectedAnalysis(analysis)}
+              >
+                {/* Mobile Layout */}
+                <div className="sm:hidden">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-3 h-3 rounded-full ${game?.user_color === 'white' ? 'bg-white' : 'bg-gray-800 border border-gray-600'}`} />
+                      <span className="font-medium text-[#f5f5f5] truncate max-w-[140px]">
+                        {game?.opponent || 'Unknown'}
+                      </span>
+                    </div>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                      isWin ? 'bg-[#18be5d]/20 text-[#18be5d]' :
+                      isLoss ? 'bg-[#f44336]/20 text-[#f44336]' :
+                      'bg-[#808080]/20 text-[#808080]'
+                    }`}>
+                      {isWin ? 'Win' : isLoss ? 'Loss' : isDraw ? 'Draw' : '?'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-[#b4b4b4] mb-2">
+                    <span className="capitalize">{game?.time_class || 'Unknown'}</span>
+                    <span>•</span>
+                    <span>{game?.played_at ? new Date(game.played_at).toLocaleDateString() : '-'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-sm font-medium ${analysis.blunders.length > 0 ? 'text-[#ff6f00]' : 'text-[#18be5d]'}`}>
+                      {analysis.blunders.length} blunder{analysis.blunders.length !== 1 ? 's' : ''}
+                    </span>
+                    <span className="text-[#f5f5f5] text-xs font-medium inline-flex items-center gap-1">
+                      View
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </span>
+                  </div>
                 </div>
-                <span className="text-[#f44336] text-sm font-medium inline-flex items-center gap-1">
-                  View details
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </span>
+
+                {/* Desktop Layout */}
+                <div className="hidden sm:flex items-center gap-4">
+                  {/* Color indicator */}
+                  <span className={`w-4 h-4 rounded-full flex-shrink-0 ${game?.user_color === 'white' ? 'bg-white' : 'bg-gray-800 border border-gray-600'}`} />
+
+                  {/* Opponent & Result */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-[#f5f5f5] truncate">
+                        vs {game?.opponent || 'Unknown'}
+                      </span>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded flex-shrink-0 ${
+                        isWin ? 'bg-[#18be5d]/20 text-[#18be5d]' :
+                        isLoss ? 'bg-[#f44336]/20 text-[#f44336]' :
+                        'bg-[#808080]/20 text-[#808080]'
+                      }`}>
+                        {isWin ? 'Win' : isLoss ? 'Loss' : isDraw ? 'Draw' : '?'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Time class */}
+                  <div className="text-sm text-[#b4b4b4] capitalize w-16 text-center flex-shrink-0">
+                    {game?.time_class || '-'}
+                  </div>
+
+                  {/* Date */}
+                  <div className="text-sm text-[#b4b4b4] w-24 text-center flex-shrink-0">
+                    {game?.played_at ? new Date(game.played_at).toLocaleDateString() : '-'}
+                  </div>
+
+                  {/* Blunders */}
+                  <div className={`text-sm font-medium w-20 text-center flex-shrink-0 ${
+                    analysis.blunders.length > 0 ? 'text-[#ff6f00]' : 'text-[#18be5d]'
+                  }`}>
+                    {analysis.blunders.length} blunder{analysis.blunders.length !== 1 ? 's' : ''}
+                  </div>
+
+                  {/* View button */}
+                  <span className="text-[#f5f5f5] text-sm font-medium inline-flex items-center gap-1 flex-shrink-0">
+                    View
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
