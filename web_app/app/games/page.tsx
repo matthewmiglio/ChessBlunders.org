@@ -110,16 +110,16 @@ export default function GamesPage() {
             onChange={(e) => setImportCount(e.target.value)}
             className="bg-[#3c3c3c]/30 border border-white/10 rounded-md px-4 py-2.5 text-sm text-[#b4b4b4] focus:outline-none focus:ring-2 focus:ring-[#f44336] focus:border-transparent transition-all"
           >
-            <option value="25">Last 25 games</option>
-            <option value="50">Last 50 games</option>
-            <option value="100">Last 100 games</option>
-            <option value="250" disabled={!isPremium}>
+            <option value="25" className="bg-[#2a2a2a] text-[#f5f5f5]">Last 25 games</option>
+            <option value="50" className="bg-[#2a2a2a] text-[#f5f5f5]">Last 50 games</option>
+            <option value="100" className="bg-[#2a2a2a] text-[#f5f5f5]">Last 100 games</option>
+            <option value="250" disabled={!isPremium} className="bg-[#2a2a2a] text-[#f5f5f5]">
               Last 250 games {!isPremium && "(Premium)"}
             </option>
-            <option value="500" disabled={!isPremium}>
+            <option value="500" disabled={!isPremium} className="bg-[#2a2a2a] text-[#f5f5f5]">
               Last 500 games {!isPremium && "(Premium)"}
             </option>
-            <option value="1000" disabled={!isPremium}>
+            <option value="1000" disabled={!isPremium} className="bg-[#2a2a2a] text-[#f5f5f5]">
               Last 1000 games {!isPremium && "(Premium)"}
             </option>
           </select>
