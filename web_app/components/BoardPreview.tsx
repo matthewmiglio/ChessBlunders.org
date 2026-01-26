@@ -14,6 +14,7 @@ export function BoardPreview({ fen, size = 120 }: BoardPreviewProps) {
         options={{
           position: fen,
           allowDragging: false,
+          showNotation: false,
           boardStyle: { width: size, height: size },
           darkSquareStyle: { backgroundColor: "#5994EF" },
           lightSquareStyle: { backgroundColor: "#F2F6FA" },
