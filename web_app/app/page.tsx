@@ -1,37 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { UsernamePrompt } from "@/components/UsernamePrompt";
 
 export default function Home() {
-  const { user, profile, loading, refreshProfile } = useAuth();
+  const { user, profile, loading } = useAuth();
   const router = useRouter();
-  const [showUsernamePrompt, setShowUsernamePrompt] = useState(false);
-
-  useEffect(() => {
-    if (user && profile && !profile.chess_username) {
-      setShowUsernamePrompt(true);
-    }
-  }, [user, profile]);
-
-  const handleSetUsername = async (username: string) => {
-    const response = await fetch("/api/user", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chessUsername: username }),
-    });
-
-    if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || "Failed to set username");
-    }
-
-    await refreshProfile();
-    setShowUsernamePrompt(false);
-    router.push("/games");
-  };
 
   if (loading) {
     return (
@@ -45,12 +19,7 @@ export default function Home() {
   }
 
   return (
-    <>
-      {showUsernamePrompt && (
-        <UsernamePrompt onSubmit={handleSetUsername} />
-      )}
-
-      <div className="relative overflow-hidden">
+    <div className="relative overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0 -z-10">
           <div className="absolute inset-0 bg-gradient-to-b from-[#141414] via-[#1a1a1a] to-[#141414]" />
@@ -184,6 +153,5 @@ export default function Home() {
           </div>
         </div>
       </div>
-    </>
   );
 }
