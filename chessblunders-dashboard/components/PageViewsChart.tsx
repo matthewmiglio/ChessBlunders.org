@@ -7,6 +7,17 @@ interface DailyData {
   views: number;
 }
 
+// Convert UTC date string to EST formatted label
+function formatDateEST(dateStr: string): string {
+  // Parse as UTC noon so EST conversion stays on same calendar day
+  const date = new Date(dateStr + "T12:00:00Z");
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "America/New_York",
+  });
+}
+
 export function PageViewsChart() {
   const [data, setData] = useState<DailyData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,8 +68,7 @@ export function PageViewsChart() {
         <div className="flex-1 flex items-end gap-1" style={{ height: `${chartHeight}px` }}>
           {data.map((point, i) => {
             const barHeight = (point.views / maxViews) * chartHeight;
-            const date = new Date(point.day);
-            const label = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+            const label = formatDateEST(point.day);
             return (
               <div
                 key={i}
@@ -83,11 +93,9 @@ export function PageViewsChart() {
         {data.length <= 14 ? (
           <div className="flex-1 flex gap-1">
             {data.map((point, i) => {
-              const date = new Date(point.day);
-              const label = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
               return (
                 <span key={i} className="flex-1 text-xs text-gray-500 text-center truncate">
-                  {label}
+                  {formatDateEST(point.day)}
                 </span>
               );
             })}
@@ -95,10 +103,10 @@ export function PageViewsChart() {
         ) : (
           <div className="flex-1 flex justify-between">
             <span className="text-xs text-gray-500">
-              {new Date(data[0]?.day).toLocaleDateString()}
+              {data[0]?.day && formatDateEST(data[0].day)}
             </span>
             <span className="text-xs text-gray-500">
-              {new Date(data[data.length - 1]?.day).toLocaleDateString()}
+              {data[data.length - 1]?.day && formatDateEST(data[data.length - 1].day)}
             </span>
           </div>
         )}
