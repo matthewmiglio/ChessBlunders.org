@@ -3,17 +3,26 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "About - ChessBlunders.org",
+  title: "About ChessBlunders - Analyze Games & Practice Your Mistakes",
   description:
-    "Learn how ChessBlunders.org helps you improve at chess by analyzing your games and turning your mistakes into personalized puzzles.",
+    "ChessBlunders uses Stockfish 16 to analyze your chess games, find your blunders, and turn them into puzzles. Train on your actual mistakes to improve faster.",
   alternates: {
     canonical: "/about",
   },
   openGraph: {
-    title: "About - ChessBlunders.org",
+    title: "About ChessBlunders - Analyze Games & Practice Your Mistakes",
     description:
-      "Learn how ChessBlunders.org helps you improve at chess by analyzing your games and turning your mistakes into personalized puzzles.",
+      "ChessBlunders uses Stockfish 16 to analyze your chess games, find your blunders, and turn them into puzzles. Train on your actual mistakes to improve faster.",
     url: "https://chessblunders.org/about",
+    siteName: "ChessBlunders.org",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "About ChessBlunders - Analyze Games & Practice Your Mistakes",
+    description:
+      "Stockfish 16 analyzes your chess games to find blunders. Practice them as puzzles to improve faster.",
   },
 };
 
@@ -31,8 +40,9 @@ export default function AboutPage() {
           <div className="relative h-[300px] sm:h-[400px] rounded-xl overflow-hidden">
             <Image
               src="/high-res/photo-1529699211952-734e80c4d42b.avif"
-              alt="Chess pieces on a board"
+              alt="Close-up of chess pieces on a wooden board representing strategic chess training"
               fill
+              sizes="(max-width: 1280px) 100vw, 1280px"
               className="object-cover"
               priority
             />
@@ -136,8 +146,9 @@ export default function AboutPage() {
             <div className="relative h-[300px] sm:h-[400px] rounded-xl overflow-hidden order-2 md:order-1">
               <Image
                 src="/high-res/photo-1580541832626-2a7131ee809f.avif"
-                alt="Chess strategy"
+                alt="Chess pieces in strategic position illustrating pattern recognition and game analysis"
                 fill
+                sizes="(max-width: 768px) 100vw, 50vw"
                 className="object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#141414]/60 via-transparent to-transparent" />
