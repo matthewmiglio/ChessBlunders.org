@@ -24,6 +24,7 @@ interface ProgressRecord {
   blunder_index: number;
   solved: boolean;
   attempts: number;
+  practice_run: number;
 }
 
 export interface Puzzle {
@@ -90,11 +91,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: analysesError.message }, { status: 500 });
     }
 
-    // Fetch user progress for all puzzles
+    // Get current practice run from user's profile
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("current_practice_run")
+      .eq("id", user.id)
+      .single();
+
+    const currentRun = profileData?.current_practice_run || 1;
+
+    // Fetch user progress for current practice run only
     const { data: progressData, error: progressError } = await supabase
       .from("user_progress")
-      .select("analysis_id, blunder_index, solved, attempts")
-      .eq("user_id", user.id);
+      .select("analysis_id, blunder_index, solved, attempts, practice_run")
+      .eq("user_id", user.id)
+      .eq("practice_run", currentRun);
 
     if (progressError) {
       return NextResponse.json({ error: progressError.message }, { status: 500 });
@@ -184,6 +195,7 @@ export async function GET(request: NextRequest) {
       total: allPuzzles.length,
       filtered: filteredPuzzles.length,
       counts,
+      currentPracticeRun: currentRun,
     });
   } catch (error) {
     console.error("Error fetching puzzles:", error);

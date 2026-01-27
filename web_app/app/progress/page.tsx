@@ -35,11 +35,6 @@ export default function ProgressPage() {
       const res = await fetch("/api/stats");
       const data = await res.json();
 
-      console.log("[progress] Stats response:", data);
-      console.log("[progress] Result counts from DB:", data._debug?.resultCounts);
-      console.log("[progress] Sample games:", data._debug?.sampleGames);
-      console.log("[progress] games_won:", data.stats?.games_won, "games_lost:", data.stats?.games_lost, "games_drawn:", data.stats?.games_drawn);
-
       if (!res.ok) {
         setError(data.error || "Failed to load stats");
         return;

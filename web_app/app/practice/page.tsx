@@ -1,16 +1,17 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState, useEffect, Suspense, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Blunder } from "@/lib/supabase";
-import { PuzzleFilters, FilterCounts } from "@/lib/puzzle-filters";
+import { FilterCounts } from "@/lib/puzzle-filters";
 import { Chess } from "chess.js";
-import ChessBoard from "@/components/ChessBoard";
+import ChessBoard, { BOARD_THEMES } from "@/components/ChessBoard";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { StatCard } from "@/components/StatCard";
-import { FilterBar } from "@/components/FilterBar";
 import { Puzzle } from "@/app/api/practice/puzzles/route";
+import { toast } from "sonner";
+
 
 interface UserStats {
   total_games: number;
@@ -20,7 +21,43 @@ interface UserStats {
   total_attempts: number;
 }
 
-const FILTER_STORAGE_KEY = "chessblunders_practice_filters";
+interface DetailedStats {
+  currentRun: number;
+  puzzlesCompleted: number;
+  totalBlunders: number;
+  puzzlesRemaining: number;
+  percentComplete: number;
+  gamesWithBlunders: number;
+  solvedFirst: number;
+  solvedSecond: number;
+  solvedThirdPlus: number;
+  currentStreak: number;
+  bestStreak: number;
+  runStartedAt: string | null;
+}
+
+// Get severity category from eval drop
+function getSeverityCategory(evalDrop: number): "minor" | "medium" | "major" {
+  if (evalDrop < 200) return "minor";
+  if (evalDrop < 500) return "medium";
+  return "major";
+}
+
+// Format duration from milliseconds
+function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes % 60}m`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${seconds % 60}s`;
+  }
+  return `${seconds}s`;
+}
+
 
 // Convert SAN move to UCI format using a chess position
 function sanToUci(fen: string, san: string): string | null {
@@ -97,17 +134,11 @@ function getPlayerSide(fen: string): "w" | "b" {
 function PracticeContent() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const analysisId = searchParams.get("analysisId");
-  const blunderIndexParam = searchParams.get("blunderIndex");
-  const clearFiltersParam = searchParams.get("clearFilters");
 
   const [puzzles, setPuzzles] = useState<Puzzle[]>([]);
   const [currentPuzzle, setCurrentPuzzle] = useState<Puzzle | null>(null);
   const [currentBlunder, setCurrentBlunder] = useState<Blunder | null>(null);
-  const [currentAnalysisId, setCurrentAnalysisId] = useState<string | null>(
-    null
-  );
+  const [currentAnalysisId, setCurrentAnalysisId] = useState<string | null>(null);
   const [currentBlunderIndex, setCurrentBlunderIndex] = useState<number>(0);
   const [feedback, setFeedback] = useState<{
     correct: boolean;
@@ -117,75 +148,109 @@ function PracticeContent() {
   } | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [puzzlesLoading, setPuzzlesLoading] = useState(true);
+  const [puzzlesLoading, setPuzzlesLoading] = useState(false);
   const [expectedMoveUci, setExpectedMoveUci] = useState<string>("");
   const [showHint, setShowHint] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
-
-  // Filter state - default to showing unsolved puzzles
-  const [filters, setFilters] = useState<PuzzleFilters>(() => {
-    const defaultFilters: PuzzleFilters = { solved: false };
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem(FILTER_STORAGE_KEY);
-      if (stored) {
-        try {
-          return JSON.parse(stored);
-        } catch {
-          return defaultFilters;
-        }
-      }
-    }
-    return defaultFilters;
-  });
   const [filterCounts, setFilterCounts] = useState<FilterCounts | null>(null);
+  const [currentPracticeRun, setCurrentPracticeRun] = useState<number>(1);
+  const [resetting, setResetting] = useState(false);
+  const [boardThemeIndex, setBoardThemeIndex] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("chessblunders_board_theme");
+      return saved !== null ? parseInt(saved, 10) : 0;
+    }
+    return 0;
+  });
+  const [showThemeDropdown, setShowThemeDropdown] = useState(false);
+  const [detailedStats, setDetailedStats] = useState<DetailedStats | null>(null);
+  const [puzzleStartTime, setPuzzleStartTime] = useState<number | null>(null);
+  const [solveTimes, setSolveTimes] = useState<number[]>([]);
+  const [sessionStartTime] = useState<number>(() => Date.now());
+  const [sessionElapsed, setSessionElapsed] = useState<number>(0);
+  const [boardSize, setBoardSize] = useState<number>(500);
+  const [cardWidth, setCardWidth] = useState<number>(200);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [showIncorrect, setShowIncorrect] = useState(false);
 
+  // Persist board theme to localStorage
+  useEffect(() => {
+    localStorage.setItem("chessblunders_board_theme", String(boardThemeIndex));
+  }, [boardThemeIndex]);
+
+  // Tick session timer every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSessionElapsed(Date.now() - sessionStartTime);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [sessionStartTime]);
+
+  // Calculate board size and card width to fill viewport without scrolling
+  useEffect(() => {
+    const updateLayout = () => {
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      setIsDesktop(viewportWidth >= 1024);
+
+      if (viewportWidth >= 1024) {
+        // From layout.tsx: main has md:ml-72 (288px), lg:px-8 (32px each), sm:py-12 (48px each)
+        const navbarMargin = 288; // ml-72 = 18rem = 288px
+        const horizontalPadding = 64; // lg:px-8 = 32px * 2
+        const verticalPadding = 96; // sm:py-12 = 48px * 2
+        const footerHeight = 56;
+        const gapSize = 16; // gap-4 between elements
+        const horizontalGaps = gapSize * 2; // 2 gaps: card-board, board-card
+
+        // Available height for content (viewport - vertical padding - footer)
+        const maxBoardByHeight = viewportHeight - verticalPadding - footerHeight;
+
+        // Available width for content (viewport - navbar - horizontal padding)
+        const contentWidth = viewportWidth - navbarMargin - horizontalPadding;
+
+        // Minimum card width
+        const minCardWidth = 160;
+
+        // Maximum board size based on width
+        const maxBoardByWidth = contentWidth - (minCardWidth * 2) - horizontalGaps;
+
+        // Board size is the smaller of height and width constraints
+        const finalBoardSize = Math.max(280, Math.min(maxBoardByHeight, maxBoardByWidth));
+
+        // Card width fills remaining horizontal space equally
+        const remainingWidth = contentWidth - finalBoardSize - horizontalGaps;
+        const finalCardWidth = Math.max(minCardWidth, Math.floor(remainingWidth / 2));
+
+        setBoardSize(finalBoardSize);
+        setCardWidth(finalCardWidth);
+      } else {
+        setBoardSize(Math.min(viewportWidth * 0.92, 500));
+        setCardWidth(viewportWidth * 0.92);
+      }
+    };
+    updateLayout();
+    window.addEventListener("resize", updateLayout);
+    return () => window.removeEventListener("resize", updateLayout);
+  }, []);
+
+  const currentTheme = BOARD_THEMES[boardThemeIndex] || BOARD_THEMES[0];
+
+  // Dynamic scaling factor for card content based on board size
+  // Base reference: 520px board = scale 1.0
+  const scale = isDesktop ? Math.max(0.95, Math.min(1.65, boardSize / 520)) : 1;
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/");
     }
   }, [authLoading, user, router]);
 
-  // Clear filters when coming from analysis page with a specific puzzle
-  useEffect(() => {
-    if (clearFiltersParam === "true") {
-      setFilters({});
-      localStorage.removeItem(FILTER_STORAGE_KEY);
-    }
-  }, [clearFiltersParam]);
-
   useEffect(() => {
     if (user) {
       fetchStats();
+      fetchDetailedStats();
+      fetchPuzzles();
     }
   }, [user]);
 
-  // Persist filters to localStorage
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters));
-    }
-  }, [filters]);
-
-  // Fetch puzzles when filters change
-  useEffect(() => {
-    if (user) {
-      fetchPuzzles();
-    }
-  }, [user, filters]);
-
-  useEffect(() => {
-    if (analysisId && blunderIndexParam !== null && puzzles.length > 0) {
-      const puzzle = puzzles.find(
-        (p) => p.analysisId === analysisId && p.blunderIndex === parseInt(blunderIndexParam)
-      );
-      if (puzzle) {
-        setCurrentPuzzle(puzzle);
-        setCurrentAnalysisId(puzzle.analysisId);
-        setCurrentBlunderIndex(puzzle.blunderIndex);
-        setCurrentBlunder(puzzle.blunder);
-      }
-    }
-  }, [analysisId, blunderIndexParam, puzzles]);
 
   // Convert best_move to UCI when blunder changes
   useEffect(() => {
@@ -193,6 +258,8 @@ function PracticeContent() {
       const uci = sanToUci(currentBlunder.fen, currentBlunder.best_move);
       setExpectedMoveUci(uci || "");
       setShowHint(false);
+      // Start timing for this puzzle
+      setPuzzleStartTime(Date.now());
     }
   }, [currentBlunder]);
 
@@ -208,29 +275,33 @@ function PracticeContent() {
     }
   };
 
+  const fetchDetailedStats = async () => {
+    try {
+      const res = await fetch("/api/practice/stats");
+      const data = await res.json();
+      if (!data.error) {
+        setDetailedStats(data);
+      }
+    } catch (error) {
+      console.error("Error fetching detailed stats:", error);
+    }
+  };
+
   const fetchPuzzles = async () => {
     setPuzzlesLoading(true);
     try {
-      // Build query string from filters
-      const params = new URLSearchParams();
-      if (filters.phase) params.set("phase", filters.phase);
-      if (filters.severity) params.set("severity", filters.severity);
-      if (filters.timeControl) params.set("timeControl", filters.timeControl);
-      if (filters.color) params.set("color", filters.color);
-      if (filters.result) params.set("result", filters.result);
-      if (filters.pieceType) params.set("pieceType", filters.pieceType);
-      if (filters.dateRange) params.set("dateRange", filters.dateRange);
-      if (filters.openingFamily) params.set("openingFamily", filters.openingFamily);
-      if (filters.solved !== undefined) params.set("solved", String(filters.solved));
-
-      const res = await fetch(`/api/practice/puzzles?${params.toString()}`);
+      // Always fetch only unsolved puzzles
+      const res = await fetch(`/api/practice/puzzles?solved=false`);
       const data = await res.json();
 
       setPuzzles(data.puzzles || []);
       setFilterCounts(data.counts || null);
+      if (data.currentPracticeRun) {
+        setCurrentPracticeRun(data.currentPracticeRun);
+      }
 
-      // If no specific puzzle requested, pick a random one
-      if (!analysisId && data.puzzles?.length > 0 && !currentPuzzle) {
+      // Pick a random puzzle
+      if (data.puzzles?.length > 0 && !currentPuzzle) {
         pickRandomPuzzle(data.puzzles);
       }
     } catch (error) {
@@ -265,6 +336,12 @@ function PracticeContent() {
     const { message, isCorrect } = getMoveRankFeedback(rank);
 
     if (isCorrect) {
+      // Track solve time
+      if (puzzleStartTime) {
+        const solveTime = Date.now() - puzzleStartTime;
+        setSolveTimes(prev => [...prev, solveTime]);
+      }
+
       // Show success feedback
       setFeedback({
         correct: isCorrect,
@@ -280,12 +357,14 @@ function PracticeContent() {
         userMove: userMoveUci,
         rank: null,
       });
+      setShowIncorrect(true);
 
       // Reset the puzzle after a brief delay
       setTimeout(() => {
         setPuzzleKey(prev => prev + 1); // Force board to reset
         setFeedback(null);
         setShowHint(false);
+        setShowIncorrect(false);
       }, 800);
     }
 
@@ -307,14 +386,17 @@ function PracticeContent() {
       const userRes = await fetch("/api/user");
       const userData = await userRes.json();
       setStats(userData.stats);
+
+      // Refresh detailed stats
+      fetchDetailedStats();
     } catch (error) {
       console.error("Error recording progress:", error);
     }
   };
 
   const nextPuzzle = () => {
-    // If filtering by unsolved, remove the just-solved puzzle from the array
-    if (filters.solved === false && currentPuzzle) {
+    // Remove the just-solved puzzle from the array
+    if (currentPuzzle) {
       const remainingPuzzles = puzzles.filter(
         p => !(p.analysisId === currentPuzzle.analysisId && p.blunderIndex === currentPuzzle.blunderIndex)
       );
@@ -325,11 +407,40 @@ function PracticeContent() {
     }
   };
 
+  const handleStartNewRun = async () => {
+    setResetting(true);
+    try {
+      const res = await fetch("/api/practice/reset", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        setCurrentPracticeRun(data.newPracticeRun);
+        toast.success(`Started practice run #${data.newPracticeRun}`);
+        // Reset current puzzle state
+        setCurrentPuzzle(null);
+        setCurrentBlunder(null);
+        setFeedback(null);
+        // Reset solve times for new run
+        setSolveTimes([]);
+        // Refresh puzzles and stats
+        await fetchPuzzles();
+        await fetchStats();
+        await fetchDetailedStats();
+      } else {
+        toast.error(data.error || "Failed to start new run");
+      }
+    } catch (error) {
+      console.error("Error starting new run:", error);
+      toast.error("Failed to start new practice run");
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const handleShowHint = () => {
     setShowHint(true);
   };
 
-  if (authLoading || loading) {
+  if (authLoading) {
     return <LoadingSpinner />;
   }
 
@@ -382,94 +493,35 @@ function PracticeContent() {
     }
   };
 
-  const activeFilterCount = Object.values(filters).filter(
-    (v) => v !== undefined
-  ).length;
-
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#f5f5f5]">
-          Practice Mode
-        </h1>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            showFilters || activeFilterCount > 0
-              ? "bg-[#8a2be2] text-white"
-              : "bg-[#3c3c3c] text-[#b4b4b4] hover:bg-[#4c4c4c]"
-          }`}
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-            />
-          </svg>
-          Filters
-          {activeFilterCount > 0 && (
-            <span className="bg-white/20 px-1.5 py-0.5 rounded text-xs">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* Filter Bar */}
-      {showFilters && (
-        <div className="mb-6">
-          <FilterBar
-            filters={filters}
-            onChange={setFilters}
-            counts={filterCounts}
-            loading={puzzlesLoading}
-          />
-        </div>
-      )}
-
-      {/* Puzzle count summary */}
-      {filterCounts && (
-        <div className="mb-6 text-sm text-[#b4b4b4]">
-          {activeFilterCount > 0 ? (
-            <span>
-              Showing <span className="text-[#f5f5f5] font-medium">{puzzles.length}</span> of{" "}
-              <span className="text-[#f5f5f5] font-medium">{filterCounts.all}</span> puzzles
-            </span>
-          ) : (
-            <span>
-              <span className="text-[#f5f5f5] font-medium">{filterCounts.all}</span> puzzles available
-            </span>
-          )}
-        </div>
-      )}
-
+    <div>
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <StatCard label="Total Blunders" value={stats.total_blunders} centered />
-          <StatCard label="Solved" value={stats.solved_blunders} valueColor="text-[#18be5d]" centered />
-          <StatCard label="Total Attempts" value={stats.total_attempts} centered />
-          <StatCard
-            label="Success Rate"
-            value={`${stats.total_attempts > 0 ? Math.round((stats.solved_blunders / stats.total_attempts) * 100) : 0}%`}
-            valueColor="text-[#f44336]"
-            centered
-          />
+        <div className="mb-6">
+          {currentPracticeRun > 1 && (
+            <div className="text-sm text-[#b4b4b4] mb-3">
+              Practice Run #{currentPracticeRun}
+            </div>
+          )}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl">
+            <StatCard label="Total Blunders" value={stats.total_blunders} centered />
+            <StatCard label="Solved" value={stats.solved_blunders} valueColor="text-[#18be5d]" centered />
+            <StatCard label="Total Attempts" value={stats.total_attempts} centered />
+            <StatCard
+              label="Success Rate"
+              value={`${stats.total_attempts > 0 ? Math.round((stats.solved_blunders / stats.total_attempts) * 100) : 0}%`}
+              valueColor="text-[#f44336]"
+              centered
+            />
+          </div>
         </div>
       )}
 
-      {/* No matching puzzles message */}
+      {/* All puzzles solved message */}
       {!puzzlesLoading && puzzles.length === 0 && filterCounts && filterCounts.all > 0 && (
         <div className="bg-[#202020] border border-white/10 rounded-lg p-8 text-center">
-          <div className="w-16 h-16 rounded-lg bg-[#3c3c3c] flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 rounded-lg bg-[#18be5d]/20 flex items-center justify-center mx-auto mb-4">
             <svg
-              className="w-8 h-8 text-[#b4b4b4]"
+              className="w-8 h-8 text-[#18be5d]"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -477,218 +529,471 @@ function PracticeContent() {
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
               />
             </svg>
           </div>
           <h3 className="text-lg font-medium text-[#f5f5f5] mb-2">
-            No puzzles match your filters
+            All puzzles solved!
           </h3>
           <p className="text-[#b4b4b4] mb-4">
-            Try adjusting your filter criteria to see more puzzles.
+            You've completed all {filterCounts.all} puzzles in practice run #{currentPracticeRun}.
           </p>
-          <button
-            onClick={() => setFilters({})}
-            className="inline-flex items-center justify-center rounded-md bg-[#8a2be2] px-4 py-2 text-sm font-medium text-white hover:bg-[#8a2be2]/90 transition-colors"
-          >
-            Clear All Filters
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              onClick={handleStartNewRun}
+              disabled={resetting}
+              className="inline-flex items-center justify-center rounded-md bg-[#8a2be2] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#8a2be2]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {resetting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Starting...
+                </>
+              ) : (
+                "Start New Practice Run"
+              )}
+            </button>
+            <button
+              onClick={() => router.push("/games")}
+              className="inline-flex items-center justify-center rounded-md border border-white/20 bg-transparent px-5 py-2.5 text-sm font-medium text-[#b4b4b4] hover:bg-white/5 hover:text-[#f5f5f5] transition-colors"
+            >
+              Import More Games
+            </button>
+          </div>
         </div>
       )}
 
       {currentBlunder && puzzles.length > 0 && (
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Left: Chess Board */}
-          <div className="flex-1 lg:max-w-[60%]">
-            <div className="bg-[#202020] border border-white/10 rounded-lg p-6">
-              <div className="text-center mb-4">
-                <h2 className="text-xl font-semibold text-[#f5f5f5]">
-                  {playerSide === "w" ? "White" : "Black"} to move
-                </h2>
-                <p className="text-[#b4b4b4] text-sm mt-1">
-                  Find the best move
-                </p>
+        <div className="flex flex-col lg:flex-row lg:items-stretch gap-4">
+          {/* Left: Statistics Card */}
+          <div
+            className="flex-shrink-0 order-2 lg:order-1"
+            style={{ width: isDesktop ? cardWidth : '100%', height: isDesktop ? boardSize : 'auto' }}
+          >
+            <div
+              className="bg-[#202020] border border-white/10 rounded-lg flex flex-col h-full overflow-y-auto"
+              style={{ padding: `${12 * scale}px ${14 * scale}px` }}
+            >
+              {/* Progress Section */}
+              <div>
+                <h3
+                  className="font-medium text-[#b4b4b4] uppercase tracking-wider"
+                  style={{ fontSize: `${11 * scale}px`, marginBottom: `${6 * scale}px` }}
+                >
+                  Progress
+                </h3>
+                {/* Progress Bar */}
+                <div style={{ marginBottom: `${6 * scale}px` }}>
+                  <div className="flex justify-between" style={{ fontSize: `${12 * scale}px`, marginBottom: `${4 * scale}px` }}>
+                    <span className="text-[#f5f5f5] font-medium">
+                      {detailedStats?.puzzlesCompleted || 0} / {detailedStats?.totalBlunders || 0}
+                    </span>
+                    <span className="text-[#8a2be2] font-medium">
+                      {detailedStats?.percentComplete || 0}%
+                    </span>
+                  </div>
+                  <div className="bg-[#3c3c3c] rounded-full overflow-hidden" style={{ height: `${6 * scale}px` }}>
+                    <div
+                      className="h-full bg-[#8a2be2] rounded-full transition-all duration-300"
+                      style={{ width: `${detailedStats?.percentComplete || 0}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2" style={{ gap: `${6 * scale}px`, fontSize: `${11 * scale}px` }}>
+                  <div className="flex justify-between">
+                    <span className="text-[#b4b4b4]">Remaining</span>
+                    <span className="text-[#f5f5f5]">{detailedStats?.puzzlesRemaining || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#b4b4b4]">Games</span>
+                    <span className="text-[#f5f5f5]">{detailedStats?.gamesWithBlunders || 0}</span>
+                  </div>
+                </div>
               </div>
 
-              <ChessBoard
-                key={puzzleKey}
-                fen={currentBlunder.fen}
-                expectedMove={expectedMoveUci}
-                onMoveResult={handleMoveResult}
-                playerSide={playerSide}
-                isActive={!feedback || !feedback.correct}
-                hintArrow={hintArrow}
-                onPieceClick={handlePieceClick}
-              />
+              {/* Accuracy Section */}
+              <div className="border-t border-white/10" style={{ paddingTop: `${10 * scale}px`, marginTop: `${10 * scale}px` }}>
+                <h3
+                  className="font-medium text-[#b4b4b4] uppercase tracking-wider"
+                  style={{ fontSize: `${11 * scale}px`, marginBottom: `${6 * scale}px` }}
+                >
+                  Accuracy
+                </h3>
+                <div style={{ fontSize: `${11 * scale}px` }}>
+                  <div className="flex justify-between items-center" style={{ marginBottom: `${3 * scale}px` }}>
+                    <span className="text-[#b4b4b4]">1st try</span>
+                    <span className="text-[#18be5d] font-medium">{detailedStats?.solvedFirst || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center" style={{ marginBottom: `${3 * scale}px` }}>
+                    <span className="text-[#b4b4b4]">2nd try</span>
+                    <span className="text-[#3b82f6] font-medium">{detailedStats?.solvedSecond || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[#b4b4b4]">3+ tries</span>
+                    <span className="text-[#eab308] font-medium">{detailedStats?.solvedThirdPlus || 0}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Streaks Section */}
+              <div className="border-t border-white/10" style={{ paddingTop: `${10 * scale}px`, marginTop: `${10 * scale}px` }}>
+                <h3
+                  className="font-medium text-[#b4b4b4] uppercase tracking-wider"
+                  style={{ fontSize: `${11 * scale}px`, marginBottom: `${6 * scale}px` }}
+                >
+                  Streaks
+                </h3>
+                <div className="grid grid-cols-2" style={{ gap: `${6 * scale}px` }}>
+                  <div className="bg-[#2a2a2a] rounded-md text-center" style={{ padding: `${6 * scale}px` }}>
+                    <div className="font-bold text-[#f5f5f5]" style={{ fontSize: `${20 * scale}px` }}>{detailedStats?.currentStreak || 0}</div>
+                    <div className="text-[#b4b4b4]" style={{ fontSize: `${10 * scale}px` }}>Current</div>
+                  </div>
+                  <div className="bg-[#2a2a2a] rounded-md text-center" style={{ padding: `${6 * scale}px` }}>
+                    <div className="font-bold text-[#18be5d]" style={{ fontSize: `${20 * scale}px` }}>{detailedStats?.bestStreak || 0}</div>
+                    <div className="text-[#b4b4b4]" style={{ fontSize: `${10 * scale}px` }}>Best</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Time Section */}
+              <div className="border-t border-white/10" style={{ paddingTop: `${10 * scale}px`, marginTop: `${10 * scale}px` }}>
+                <h3
+                  className="font-medium text-[#b4b4b4] uppercase tracking-wider"
+                  style={{ fontSize: `${11 * scale}px`, marginBottom: `${6 * scale}px` }}
+                >
+                  Time
+                </h3>
+                <div style={{ fontSize: `${11 * scale}px` }}>
+                  <div className="flex justify-between items-center" style={{ marginBottom: `${3 * scale}px` }}>
+                    <span className="text-[#b4b4b4]">Avg/puzzle</span>
+                    <span className="text-[#f5f5f5] font-mono">
+                      {solveTimes.length > 0
+                        ? formatDuration(solveTimes.reduce((a, b) => a + b, 0) / solveTimes.length)
+                        : "--"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center" style={{ marginBottom: `${3 * scale}px` }}>
+                    <span className="text-[#b4b4b4]">Session</span>
+                    <span className="text-[#f5f5f5] font-mono">
+                      {formatDuration(sessionElapsed)}
+                    </span>
+                  </div>
+                  {detailedStats?.runStartedAt && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-[#b4b4b4]">Started</span>
+                      <span className="text-[#f5f5f5]" style={{ fontSize: `${10 * scale}px` }}>
+                        {new Date(detailedStats.runStartedAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Severity Breakdown */}
+              <div className="border-t border-white/10" style={{ paddingTop: `${10 * scale}px`, marginTop: `${10 * scale}px` }}>
+                <h3
+                  className="font-medium text-[#b4b4b4] uppercase tracking-wider"
+                  style={{ fontSize: `${11 * scale}px`, marginBottom: `${6 * scale}px` }}
+                >
+                  By Severity
+                </h3>
+                {(() => {
+                  const severityCounts = { minor: 0, medium: 0, major: 0 };
+                  puzzles.forEach(p => {
+                    const sev = getSeverityCategory(p.blunder.eval_drop);
+                    severityCounts[sev]++;
+                  });
+                  const totalRemaining = puzzles.length;
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: `${5 * scale}px` }}>
+                      <div className="flex items-center" style={{ gap: `${6 * scale}px` }}>
+                        <div className="flex-1 bg-[#3c3c3c] rounded-full overflow-hidden" style={{ height: `${5 * scale}px` }}>
+                          <div className="h-full bg-[#eab308] rounded-full" style={{ width: totalRemaining > 0 ? `${(severityCounts.minor / totalRemaining) * 100}%` : '0%' }} />
+                        </div>
+                        <span className="text-[#eab308]" style={{ fontSize: `${9 * scale}px`, width: `${50 * scale}px` }}>Minor ({severityCounts.minor})</span>
+                      </div>
+                      <div className="flex items-center" style={{ gap: `${6 * scale}px` }}>
+                        <div className="flex-1 bg-[#3c3c3c] rounded-full overflow-hidden" style={{ height: `${5 * scale}px` }}>
+                          <div className="h-full bg-[#f97316] rounded-full" style={{ width: totalRemaining > 0 ? `${(severityCounts.medium / totalRemaining) * 100}%` : '0%' }} />
+                        </div>
+                        <span className="text-[#f97316]" style={{ fontSize: `${9 * scale}px`, width: `${50 * scale}px` }}>Med ({severityCounts.medium})</span>
+                      </div>
+                      <div className="flex items-center" style={{ gap: `${6 * scale}px` }}>
+                        <div className="flex-1 bg-[#3c3c3c] rounded-full overflow-hidden" style={{ height: `${5 * scale}px` }}>
+                          <div className="h-full bg-[#f44336] rounded-full" style={{ width: totalRemaining > 0 ? `${(severityCounts.major / totalRemaining) * 100}%` : '0%' }} />
+                        </div>
+                        <span className="text-[#f44336]" style={{ fontSize: `${9 * scale}px`, width: `${50 * scale}px` }}>Major ({severityCounts.major})</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+              {/* Spacer to fill remaining height */}
+              <div className="flex-grow" />
             </div>
           </div>
 
-          {/* Right: Info Panel */}
-          <div className="flex-1 lg:max-w-[40%]">
-            <div className="bg-[#202020] border border-white/10 rounded-lg p-6 space-y-6">
-              {/* Puzzle Context */}
-              {currentPuzzle?.game && (
-                <div>
-                  <h3 className="text-sm font-medium text-[#b4b4b4] uppercase tracking-wider mb-3">
-                    Game Info
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="px-2 py-1 text-xs rounded bg-[#3c3c3c] text-[#b4b4b4]">
-                      {currentPuzzle.game.time_class || "Unknown"}
-                    </span>
-                    <span className="px-2 py-1 text-xs rounded bg-[#3c3c3c] text-[#b4b4b4]">
-                      {currentPuzzle.game.user_color === "white" ? "White" : "Black"}
-                    </span>
-                    <span className={`px-2 py-1 text-xs rounded ${
-                      currentPuzzle.resultCategory === "win"
-                        ? "bg-[#18be5d]/20 text-[#18be5d]"
-                        : currentPuzzle.resultCategory === "loss"
-                        ? "bg-[#f44336]/20 text-[#f44336]"
-                        : "bg-[#808080]/20 text-[#808080]"
-                    }`}>
-                      {currentPuzzle.resultCategory === "win"
-                        ? "Won"
-                        : currentPuzzle.resultCategory === "loss"
-                        ? "Lost"
-                        : "Draw"}
-                    </span>
-                    <span className="px-2 py-1 text-xs rounded bg-[#3c3c3c] text-[#b4b4b4]">
-                      Move {currentBlunder.move_number}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Blunder Info */}
-              <div>
-                <h3 className="text-sm font-medium text-[#b4b4b4] uppercase tracking-wider mb-3">
-                  Position Info
-                </h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center py-2 border-b border-white/5">
-                    <span className="text-[#b4b4b4]">You played</span>
-                    <span className="font-mono text-[#f44336]">
-                      {currentBlunder.move_played}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-white/5">
-                    <span className="text-[#b4b4b4]">Eval before</span>
-                    <span className="font-mono text-[#f5f5f5]">
-                      {currentBlunder.eval_before > 0 ? "+" : ""}
-                      {(currentBlunder.eval_before / 100).toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-white/5">
-                    <span className="text-[#b4b4b4]">Eval after</span>
-                    <span className="font-mono text-[#f44336]">
-                      {currentBlunder.eval_after > 0 ? "+" : ""}
-                      {(currentBlunder.eval_after / 100).toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-[#b4b4b4]">Eval drop</span>
-                    <span className="font-mono text-[#f44336]">
-                      -{currentBlunder.eval_drop} cp
-                    </span>
-                  </div>
+          {/* Center: Chess Board */}
+          <div className="flex-shrink-0 order-1 lg:order-2 relative">
+            {/* Incorrect move overlay */}
+            {showIncorrect && (
+              <div className="absolute inset-0 bg-red-500/20 rounded-lg z-10 pointer-events-none flex items-center justify-center">
+                <div className="bg-[#202020] border border-red-500/50 text-red-500 px-6 py-3 rounded-lg font-semibold text-xl shadow-lg">
+                  Incorrect - Try again!
                 </div>
               </div>
+            )}
+            <ChessBoard
+              key={puzzleKey}
+              fen={currentBlunder.fen}
+              expectedMove={expectedMoveUci}
+              onMoveResult={handleMoveResult}
+              playerSide={playerSide}
+              isActive={!feedback || !feedback.correct}
+              hintArrow={hintArrow}
+              onPieceClick={handlePieceClick}
+              darkSquareColor={currentTheme.dark}
+              lightSquareColor={currentTheme.light}
+              size={boardSize}
+            />
+          </div>
 
-              {/* Hint Button */}
-              {!feedback && !showHint && (
-                <button
-                  onClick={handleShowHint}
-                  className="w-full py-3 px-4 rounded-md border border-[#ff6f00]/30 bg-[#ff6f00]/10 text-[#ff6f00] hover:bg-[#ff6f00]/20 transition-colors text-sm font-medium"
-                >
-                  Show Hint
-                </button>
+          {/* Right: Info Panel */}
+          <div
+            className="flex-shrink-0 order-3"
+            style={{ width: isDesktop ? cardWidth : '100%', height: isDesktop ? boardSize : 'auto' }}
+          >
+            <div
+              className="bg-[#202020] border border-white/10 rounded-lg flex flex-col h-full overflow-y-auto"
+              style={{ padding: `${12 * scale}px ${14 * scale}px` }}
+            >
+              {/* Player to move */}
+              <div className="text-center border-b border-white/10" style={{ paddingBottom: `${10 * scale}px` }}>
+                <h2 className="font-bold text-[#f5f5f5]" style={{ fontSize: `${18 * scale}px` }}>
+                  {playerSide === "w" ? "White" : "Black"} to move
+                </h2>
+              </div>
+
+              {/* Puzzle Context */}
+              {currentPuzzle?.game && (
+                <div style={{ paddingTop: `${8 * scale}px` }}>
+                  <h3
+                    className="font-medium text-[#b4b4b4] uppercase tracking-wider"
+                    style={{ fontSize: `${10 * scale}px`, marginBottom: `${6 * scale}px` }}
+                  >
+                    Game Info
+                  </h3>
+                  <div className="flex flex-wrap" style={{ gap: `${4 * scale}px` }}>
+                    <span
+                      className="inline-flex items-center rounded bg-[#3c3c3c] text-[#b4b4b4]"
+                      style={{ gap: `${3 * scale}px`, padding: `${4 * scale}px ${6 * scale}px`, fontSize: `${10 * scale}px` }}
+                    >
+                      <svg style={{ width: `${12 * scale}px`, height: `${12 * scale}px` }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      {currentPuzzle.game.time_class || "?"}
+                    </span>
+                    <span
+                      className="inline-flex items-center rounded bg-[#3c3c3c] text-[#b4b4b4]"
+                      style={{ gap: `${3 * scale}px`, padding: `${4 * scale}px ${6 * scale}px`, fontSize: `${10 * scale}px` }}
+                    >
+                      <svg style={{ width: `${12 * scale}px`, height: `${12 * scale}px` }} fill="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" fill={currentPuzzle.game.user_color === "white" ? "#fff" : "#333"} stroke="#666" strokeWidth="1"/>
+                      </svg>
+                      {currentPuzzle.game.user_color === "white" ? "W" : "B"}
+                    </span>
+                    <span
+                      className={`inline-flex items-center rounded ${
+                        currentPuzzle.resultCategory === "win"
+                          ? "bg-[#18be5d]/20 text-[#18be5d]"
+                          : currentPuzzle.resultCategory === "loss"
+                          ? "bg-[#f44336]/20 text-[#f44336]"
+                          : "bg-[#808080]/20 text-[#808080]"
+                      }`}
+                      style={{ gap: `${3 * scale}px`, padding: `${4 * scale}px ${6 * scale}px`, fontSize: `${10 * scale}px` }}
+                    >
+                      <svg style={{ width: `${12 * scale}px`, height: `${12 * scale}px` }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        {currentPuzzle.resultCategory === "win" ? (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                        ) : currentPuzzle.resultCategory === "loss" ? (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        ) : (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h8" />
+                        )}
+                      </svg>
+                      {currentPuzzle.resultCategory === "win" ? "W" : currentPuzzle.resultCategory === "loss" ? "L" : "D"}
+                    </span>
+                    <span
+                      className="inline-flex items-center rounded bg-[#3c3c3c] text-[#b4b4b4]"
+                      style={{ gap: `${3 * scale}px`, padding: `${4 * scale}px ${6 * scale}px`, fontSize: `${10 * scale}px` }}
+                    >
+                      #{currentBlunder.move_number}
+                    </span>
+                  </div>
+                </div>
               )}
 
-              {/* Feedback */}
-              {feedback && (
-                <div className="space-y-4">
+              {/* Position Info OR Feedback (mutually exclusive) */}
+              {feedback?.correct ? (
+                <div style={{ paddingTop: `${8 * scale}px` }}>
+                  {/* Feedback Banner */}
                   <div
-                    className={`p-5 rounded-md ${
+                    className={`rounded-md ${
                       feedback.rank === 1
                         ? "bg-[#18be5d]/10 border border-[#18be5d]/30 text-[#18be5d]"
                         : feedback.rank === 2
                         ? "bg-[#3b82f6]/10 border border-[#3b82f6]/30 text-[#3b82f6]"
-                        : feedback.rank === 3
-                        ? "bg-[#eab308]/10 border border-[#eab308]/30 text-[#eab308]"
-                        : "bg-[#f44336]/10 border border-[#f44336]/30 text-[#f44336]"
+                        : "bg-[#eab308]/10 border border-[#eab308]/30 text-[#eab308]"
                     }`}
+                    style={{ padding: `${8 * scale}px`, marginBottom: `${8 * scale}px` }}
                   >
-                    <div className="flex items-center gap-2 mb-2">
-                      {feedback.correct ? (
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                      ) : (
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
-                      )}
-                      <span className="font-semibold">
-                        {feedback.rank === 1 ? "Best Move!" :
-                         feedback.rank === 2 ? "#2 Move!" :
-                         feedback.rank === 3 ? "#3 Move!" : "Incorrect"}
+                    <div className="flex items-center" style={{ gap: `${6 * scale}px` }}>
+                      <svg style={{ width: `${14 * scale}px`, height: `${14 * scale}px` }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="font-semibold" style={{ fontSize: `${12 * scale}px` }}>
+                        {feedback.rank === 1 ? "Best Move!" : feedback.rank === 2 ? "#2 Move!" : "#3 Move!"}
                       </span>
                     </div>
-                    <p className="text-sm opacity-90">{feedback.message}</p>
                   </div>
 
-                  {/* Show all top moves after solving */}
-                  {feedback.correct && currentBlunder?.top_moves && currentBlunder.top_moves.length > 0 && (
-                    <div className="bg-[#2a2a2a] border border-white/10 p-4 rounded-md">
-                      <p className="text-sm text-[#b4b4b4] mb-3">Top moves in this position:</p>
+                  {/* Top Moves */}
+                  <h3
+                    className="font-medium text-[#b4b4b4] uppercase tracking-wider"
+                    style={{ fontSize: `${10 * scale}px`, marginBottom: `${6 * scale}px` }}
+                  >
+                    Top Moves
+                  </h3>
+                  {currentBlunder?.top_moves && currentBlunder.top_moves.length > 0 ? (
+                    <div>
                       {currentBlunder.top_moves.map((m, i) => (
-                        <div key={i} className="flex items-center gap-3 py-2 border-b border-white/5 last:border-0">
-                          <span className={`w-6 text-sm font-medium ${
-                            i === 0 ? "text-[#18be5d]" :
-                            i === 1 ? "text-[#3b82f6]" :
-                            "text-[#eab308]"
-                          }`}>#{i + 1}</span>
-                          <span className="font-mono font-bold text-[#f5f5f5]">
-                            {uciToSan(currentBlunder.fen, m.move) || m.move}
-                          </span>
-                          <span className="text-sm text-[#b4b4b4]">
-                            ({m.score > 0 ? '+' : ''}{(m.score / 100).toFixed(2)})
+                        <div
+                          key={i}
+                          className="flex justify-between items-center border-b border-white/5 last:border-0"
+                          style={{ padding: `${4 * scale}px 0` }}
+                        >
+                          <div className="flex items-center" style={{ gap: `${4 * scale}px` }}>
+                            <span className={`font-medium ${
+                              i === 0 ? "text-[#18be5d]" : i === 1 ? "text-[#3b82f6]" : "text-[#eab308]"
+                            }`} style={{ fontSize: `${10 * scale}px` }}>#{i + 1}</span>
+                            <span className="font-mono font-bold text-[#f5f5f5]" style={{ fontSize: `${12 * scale}px` }}>
+                              {uciToSan(currentBlunder.fen, m.move) || m.move}
+                            </span>
+                          </div>
+                          <span className="font-mono text-[#b4b4b4]" style={{ fontSize: `${10 * scale}px` }}>
+                            {m.score > 0 ? '+' : ''}{(m.score / 100).toFixed(2)}
                           </span>
                         </div>
                       ))}
                     </div>
-                  )}
-
-                  {feedback.correct && (
-                    <button
-                      onClick={nextPuzzle}
-                      className="w-full inline-flex items-center justify-center rounded-md bg-[#8a2be2] px-6 py-3.5 text-sm font-medium text-white shadow-sm hover:bg-[#8a2be2]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8a2be2] transition-all"
-                    >
-                      Next Puzzle
-                    </button>
+                  ) : (
+                    <div className="flex justify-between items-center" style={{ padding: `${4 * scale}px 0` }}>
+                      <span className="text-[#b4b4b4]" style={{ fontSize: `${10 * scale}px` }}>Best move</span>
+                      <span className="font-mono text-[#18be5d]" style={{ fontSize: `${12 * scale}px` }}>{currentBlunder.best_move}</span>
+                    </div>
                   )}
                 </div>
+              ) : (
+                <div style={{ paddingTop: `${8 * scale}px` }}>
+                  <h3
+                    className="font-medium text-[#b4b4b4] uppercase tracking-wider"
+                    style={{ fontSize: `${10 * scale}px`, marginBottom: `${6 * scale}px` }}
+                  >
+                    Position Info
+                  </h3>
+                  <div>
+                    <div className="flex justify-between items-center border-b border-white/5" style={{ padding: `${4 * scale}px 0` }}>
+                      <span className="text-[#b4b4b4]" style={{ fontSize: `${10 * scale}px` }}>You played</span>
+                      <span className="font-mono text-[#f44336]" style={{ fontSize: `${12 * scale}px` }}>
+                        {currentBlunder.move_played}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-white/5" style={{ padding: `${4 * scale}px 0` }}>
+                      <span className="text-[#b4b4b4]" style={{ fontSize: `${10 * scale}px` }}>Eval before</span>
+                      <span className="font-mono text-[#f5f5f5]" style={{ fontSize: `${12 * scale}px` }}>
+                        {currentBlunder.eval_before > 0 ? "+" : ""}
+                        {(currentBlunder.eval_before / 100).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-white/5" style={{ padding: `${4 * scale}px 0` }}>
+                      <span className="text-[#b4b4b4]" style={{ fontSize: `${10 * scale}px` }}>Eval after</span>
+                      <span className="font-mono text-[#f44336]" style={{ fontSize: `${12 * scale}px` }}>
+                        {currentBlunder.eval_after > 0 ? "+" : ""}
+                        {(currentBlunder.eval_after / 100).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center" style={{ padding: `${4 * scale}px 0` }}>
+                      <span className="text-[#b4b4b4]" style={{ fontSize: `${10 * scale}px` }}>Eval drop</span>
+                      <span className="font-mono text-[#f44336]" style={{ fontSize: `${12 * scale}px` }}>
+                        -{currentBlunder.eval_drop} cp
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Board Theme Selector */}
+              <div className="relative border-t border-white/10" style={{ paddingTop: `${8 * scale}px`, marginTop: `${8 * scale}px` }}>
+                <div className="flex items-center justify-between" style={{ padding: `${4 * scale}px 0` }}>
+                  <span className="text-[#b4b4b4]" style={{ fontSize: `${10 * scale}px` }}>Theme</span>
+                  <button
+                    onClick={() => setShowThemeDropdown(!showThemeDropdown)}
+                    className="flex items-center rounded-md border border-white/10 hover:bg-white/5 transition-colors"
+                    style={{ gap: `${4 * scale}px`, padding: `${4 * scale}px ${6 * scale}px` }}
+                  >
+                    <div className="flex" style={{ gap: `${2 * scale}px` }}>
+                      <div className="rounded-sm" style={{ width: `${12 * scale}px`, height: `${12 * scale}px`, backgroundColor: currentTheme.dark }} />
+                      <div className="rounded-sm" style={{ width: `${12 * scale}px`, height: `${12 * scale}px`, backgroundColor: currentTheme.light }} />
+                    </div>
+                  </button>
+                </div>
+
+                {showThemeDropdown && (
+                  <div className="absolute right-0 top-full mt-2 w-full bg-[#2a2a2a] border border-white/10 rounded-md z-10 max-h-48 overflow-y-auto">
+                    {BOARD_THEMES.map((theme, index) => (
+                      <button
+                        key={theme.name}
+                        onClick={() => {
+                          setBoardThemeIndex(index);
+                          setShowThemeDropdown(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 hover:bg-white/5 transition-colors ${
+                          index === boardThemeIndex ? "bg-white/10" : ""
+                        }`}
+                      >
+                        <span className="text-sm text-[#f5f5f5]">{theme.name}</span>
+                        <div className="flex gap-1">
+                          <div className="w-5 h-5 rounded-sm border border-white/10" style={{ backgroundColor: theme.dark }} />
+                          <div className="w-5 h-5 rounded-sm border border-white/10" style={{ backgroundColor: theme.light }} />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Spacer to fill remaining height */}
+              <div className="flex-grow" />
+
+              {/* Hint Button OR Next Puzzle Button */}
+              {feedback?.correct ? (
+                <button
+                  onClick={nextPuzzle}
+                  className="w-full rounded-md bg-[#8a2be2] text-white hover:bg-[#8a2be2]/90 transition-colors font-medium"
+                  style={{ padding: `${8 * scale}px ${12 * scale}px`, fontSize: `${12 * scale}px` }}
+                >
+                  Next Puzzle
+                </button>
+              ) : !showHint && (
+                <button
+                  onClick={handleShowHint}
+                  className="w-full rounded-md border border-[#ff6f00]/30 bg-[#ff6f00]/10 text-[#ff6f00] hover:bg-[#ff6f00]/20 transition-colors font-medium"
+                  style={{ padding: `${8 * scale}px ${12 * scale}px`, fontSize: `${12 * scale}px` }}
+                >
+                  Show Hint
+                </button>
               )}
             </div>
           </div>

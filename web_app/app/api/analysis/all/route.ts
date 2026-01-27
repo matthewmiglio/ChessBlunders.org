@@ -17,8 +17,6 @@ const MAX_FREE_ANALYSES = 100; // Total analyses a free user can retain
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("[analysis/all] POST request started");
-
     // Parse optional depth from request body
     let requestedDepth = DEFAULT_ANALYSIS_DEPTH;
     try {
@@ -34,12 +32,10 @@ export async function POST(request: NextRequest) {
     const isPremium = await checkPremiumAccess();
     const maxDepth = isPremium ? MAX_PREMIUM_DEPTH : MAX_FREE_DEPTH;
     const analysisDepth = Math.min(requestedDepth, maxDepth);
-    console.log(`[analysis/all] Using depth ${analysisDepth} (requested: ${requestedDepth}, premium: ${isPremium})`);
 
     let supabase;
     try {
       supabase = await createClient();
-      console.log("[analysis/all] Supabase client created");
     } catch (err) {
       console.error("[analysis/all] Failed to create Supabase client:", err);
       return NextResponse.json({ error: "Failed to create database client", details: String(err) }, { status: 500 });
@@ -53,19 +49,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Auth error", details: error.message }, { status: 401 });
     }
     user = data.user;
-    console.log("[analysis/all] User retrieved:", user?.id || "null");
   } catch (err) {
     console.error("[analysis/all] Exception getting user:", err);
     return NextResponse.json({ error: "Failed to get user", details: String(err) }, { status: 500 });
   }
 
   if (!user) {
-    console.log("[analysis/all] No user found - unauthorized");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   // Check for existing running job
-  console.log("[analysis/all] Checking for existing job...");
   let existingJob;
   try {
     const { data, error: existingJobError } = await supabase
@@ -82,14 +75,12 @@ export async function POST(request: NextRequest) {
       console.error("[analysis/all] Error checking existing job:", existingJobError);
     }
     existingJob = data;
-    console.log("[analysis/all] Existing job check complete:", existingJob ? `found job ${existingJob.id}` : "no existing job");
   } catch (err) {
     console.error("[analysis/all] Exception checking existing job:", err);
     return NextResponse.json({ error: "Failed to check existing jobs", details: String(err) }, { status: 500 });
   }
 
   if (existingJob) {
-    console.log("[analysis/all] Returning existing job info");
     return NextResponse.json({
       jobId: existingJob.id,
       status: existingJob.status,
@@ -102,7 +93,6 @@ export async function POST(request: NextRequest) {
   // Check retention limit for free users
   let existingAnalysesCount = 0;
   if (!isPremium) {
-    console.log("[analysis/all] Checking retention limit for free user...");
     const { count, error: countError } = await supabase
       .from("analysis")
       .select("*", { count: "exact", head: true })
@@ -114,10 +104,8 @@ export async function POST(request: NextRequest) {
     }
 
     existingAnalysesCount = count || 0;
-    console.log(`[analysis/all] Free user has ${existingAnalysesCount}/${MAX_FREE_ANALYSES} analyses`);
 
     if (existingAnalysesCount >= MAX_FREE_ANALYSES) {
-      console.log("[analysis/all] Free user has reached retention limit");
       return NextResponse.json({
         error: "You have reached the free analysis limit (100 games)",
         upgrade: true,
@@ -128,14 +116,12 @@ export async function POST(request: NextRequest) {
   }
 
   // Get all games using pagination (Supabase default limit is 1000)
-  console.log("[analysis/all] Fetching games...");
   const allGames: { id: string; pgn: string; user_color: string | null }[] = [];
   const PAGE_SIZE = 1000;
   let offset = 0;
 
   try {
     while (true) {
-      console.log(`[analysis/all] Fetching games page at offset ${offset}`);
       const { data: games, error: gamesError } = await supabase
         .from("games")
         .select("id, pgn, user_color")
@@ -149,7 +135,6 @@ export async function POST(request: NextRequest) {
 
       if (!games || games.length === 0) break;
       allGames.push(...games);
-      console.log(`[analysis/all] Fetched ${games.length} games, total: ${allGames.length}`);
       if (games.length < PAGE_SIZE) break;
       offset += PAGE_SIZE;
     }
@@ -157,10 +142,8 @@ export async function POST(request: NextRequest) {
     console.error("[analysis/all] Exception fetching games:", err);
     return NextResponse.json({ error: "Failed to fetch games", details: String(err) }, { status: 500 });
   }
-  console.log(`[analysis/all] Total games fetched: ${allGames.length}`);
 
   // Get all analyzed game IDs using pagination
-  console.log("[analysis/all] Fetching analyzed game IDs...");
   const allAnalyzedIds: string[] = [];
   offset = 0;
 
@@ -186,14 +169,11 @@ export async function POST(request: NextRequest) {
     console.error("[analysis/all] Exception fetching analyses:", err);
     return NextResponse.json({ error: "Failed to fetch analyses", details: String(err) }, { status: 500 });
   }
-  console.log(`[analysis/all] Found ${allAnalyzedIds.length} already analyzed games`);
 
   const analyzedGameIds = new Set(allAnalyzedIds);
   let unanalyzedGames = allGames.filter((g) => !analyzedGameIds.has(g.id));
-  console.log(`[analysis/all] Unanalyzed games: ${unanalyzedGames.length}`);
 
   if (unanalyzedGames.length === 0) {
-    console.log("[analysis/all] All games already analyzed");
     return NextResponse.json({ message: "All games already analyzed" });
   }
 
@@ -201,13 +181,11 @@ export async function POST(request: NextRequest) {
   if (!isPremium) {
     const remainingSlots = MAX_FREE_ANALYSES - existingAnalysesCount;
     if (unanalyzedGames.length > remainingSlots) {
-      console.log(`[analysis/all] Capping analysis to ${remainingSlots} games (remaining free slots)`);
       unanalyzedGames = unanalyzedGames.slice(0, remainingSlots);
     }
   }
 
   // Create job record
-  console.log("[analysis/all] Creating job record...");
   let job;
   try {
     const { data, error: jobError } = await supabase
@@ -231,16 +209,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to create analysis job - no data returned" }, { status: 500 });
     }
     job = data;
-    console.log(`[analysis/all] Job created with ID: ${job.id}`);
   } catch (err) {
     console.error("[analysis/all] Exception creating job:", err);
     return NextResponse.json({ error: "Failed to create analysis job", details: String(err) }, { status: 500 });
   }
 
   // Run analysis in background after response is sent
-  console.log("[analysis/all] Setting up background analysis...");
   after(async () => {
-    console.log("[analysis/all:bg] Background analysis starting...");
     // Create a fresh supabase client for background work
     const bgSupabase = await createClient();
     let analyzed = 0;
@@ -248,10 +223,8 @@ export async function POST(request: NextRequest) {
 
     try {
       // Process games in parallel batches
-      console.log(`[analysis/all:bg] Processing ${unanalyzedGames.length} games in batches of ${CONCURRENCY_LIMIT}`);
       for (let i = 0; i < unanalyzedGames.length; i += CONCURRENCY_LIMIT) {
         const batch = unanalyzedGames.slice(i, i + CONCURRENCY_LIMIT);
-        console.log(`[analysis/all:bg] Processing batch ${Math.floor(i / CONCURRENCY_LIMIT) + 1}, games ${i + 1}-${i + batch.length}`);
 
         const results = await Promise.allSettled(
           batch.map(async (game) => {
@@ -277,7 +250,6 @@ export async function POST(request: NextRequest) {
         }
 
         // Update progress in database
-        console.log(`[analysis/all:bg] Progress: ${analyzed} analyzed, ${failed} failed`);
         await bgSupabase.rpc("update_analysis_job_progress", {
           p_job_id: job.id,
           p_analyzed: analyzed,
@@ -286,7 +258,6 @@ export async function POST(request: NextRequest) {
       }
 
       // Mark as completed
-      console.log(`[analysis/all:bg] Analysis complete. Final: ${analyzed} analyzed, ${failed} failed`);
       await bgSupabase
         .from("analysis_jobs")
         .update({ status: "completed", completed_at: new Date().toISOString() })
@@ -306,7 +277,6 @@ export async function POST(request: NextRequest) {
   });
 
   // Return immediately with job info
-  console.log(`[analysis/all] Returning success response for job ${job.id}`);
   return NextResponse.json({
     jobId: job.id,
     status: "running",

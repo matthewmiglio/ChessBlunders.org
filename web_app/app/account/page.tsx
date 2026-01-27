@@ -19,10 +19,12 @@ export default async function AccountPage() {
     .eq('id', user.id)
     .single();
 
+  const userEmail = user.email || '';
+
   const isPremium = profile?.stripe_subscription_status === 'active'
     || profile?.stripe_subscription_status === 'trialing'
     || (profile?.stripe_subscription_status === 'canceled'
-        && new Date(profile.subscription_period_end) > new Date());
+        && profile.subscription_period_end && new Date(profile.subscription_period_end) > new Date()) || false;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -30,7 +32,7 @@ export default async function AccountPage() {
 
       <SubscriptionManager
         profile={profile}
-        userEmail={user.email}
+        userEmail={userEmail}
         isPremium={isPremium}
       />
     </div>

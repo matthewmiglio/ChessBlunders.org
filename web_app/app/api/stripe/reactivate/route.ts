@@ -18,8 +18,6 @@ export async function POST(req: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    console.log('[stripe-reactivate] User:', user.id, 'Subscription ID:', profile?.stripe_subscription_id);
-
     if (!profile?.stripe_subscription_id) {
       return NextResponse.json({ error: 'No subscription found' }, { status: 400 });
     }
@@ -29,11 +27,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Remove the cancellation
-    const updated = await stripe.subscriptions.update(profile.stripe_subscription_id, {
+    await stripe.subscriptions.update(profile.stripe_subscription_id, {
       cancel_at_period_end: false,
     });
-
-    console.log('[stripe-reactivate] Success, cancel_at_period_end:', updated.cancel_at_period_end);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

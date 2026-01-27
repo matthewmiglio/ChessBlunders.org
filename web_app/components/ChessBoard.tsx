@@ -10,6 +10,20 @@ import {
   movesMatch,
 } from "@/lib/chessBoardHelpers";
 
+// Board color themes
+export const BOARD_THEMES = [
+  { name: "Classic Blue", dark: "#5994EF", light: "#F2F6FA" },
+  { name: "Traditional Brown", dark: "#B58863", light: "#F0D9B5" },
+  { name: "Forest Green", dark: "#769656", light: "#EEEED2" },
+  { name: "Ocean Blue", dark: "#4A90A4", light: "#FFFFFF" },
+  { name: "Purple Haze", dark: "#9F7AEA", light: "#E9D5FF" },
+  { name: "Sunset Orange", dark: "#F97316", light: "#FED7AA" },
+  { name: "Bubblegum Pink", dark: "#EC4899", light: "#FCE7F3" },
+  { name: "Neon Cyber", dark: "#10B981", light: "#1F2937" },
+  { name: "Lava Red", dark: "#DC2626", light: "#FEE2E2" },
+  { name: "Cosmic Purple", dark: "#7C3AED", light: "#1E1B4B" },
+] as const;
+
 interface ChessBoardProps {
   fen: string;
   expectedMove: string; // UCI format (e.g., "e2e4")
@@ -18,6 +32,9 @@ interface ChessBoardProps {
   isActive: boolean;
   hintArrow?: { from: string; to: string } | null;
   onPieceClick?: () => void;
+  darkSquareColor?: string;
+  lightSquareColor?: string;
+  size?: number; // Optional explicit board size
 }
 
 export default function ChessBoard({
@@ -28,37 +45,51 @@ export default function ChessBoard({
   isActive,
   hintArrow,
   onPieceClick,
+  darkSquareColor = "#5994EF",
+  lightSquareColor = "#F2F6FA",
+  size,
 }: ChessBoardProps) {
   const [game, setGame] = useState(() => new Chess(fen));
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
   const [validMoves, setValidMoves] = useState<Move[]>([]);
   const [boardWidth, setBoardWidth] = useState(() => {
+    if (size) return size;
     if (typeof window !== "undefined") {
       const width = window.innerWidth;
+      const height = window.innerHeight;
       if (width >= 1024) {
-        return Math.min(width * 0.4, 560);
+        // Use viewport height minus padding for stats bar and margins
+        const availableHeight = height - 80;
+        return Math.min(availableHeight, 820);
       } else {
-        return Math.min(width * 0.9, 500);
+        return Math.min(width * 0.95, 600);
       }
     }
-    return 400;
+    return 500;
   });
 
-  // Update board size on resize
+  // Update board size on resize (or when size prop changes)
   useEffect(() => {
+    if (size) {
+      setBoardWidth(size);
+      return;
+    }
     const updateBoardSize = () => {
       const width = window.innerWidth;
+      const height = window.innerHeight;
       if (width >= 1024) {
-        setBoardWidth(Math.min(width * 0.4, 560));
+        // Use viewport height minus padding for stats bar and margins
+        const availableHeight = height - 80;
+        setBoardWidth(Math.min(availableHeight, 820));
       } else {
-        setBoardWidth(Math.min(width * 0.9, 500));
+        setBoardWidth(Math.min(width * 0.95, 600));
       }
     };
 
     updateBoardSize();
     window.addEventListener("resize", updateBoardSize);
     return () => window.removeEventListener("resize", updateBoardSize);
-  }, []);
+  }, [size]);
 
   // Sync game state with FEN prop
   useEffect(() => {
@@ -212,12 +243,11 @@ export default function ChessBoard({
 
   return (
     <div
-      className="w-full"
       style={{ opacity: isActive ? 1 : 0.5 }}
       onContextMenu={(e) => e.preventDefault()}
     >
       <div
-        className="relative mx-auto"
+        className="relative"
         style={{ width: boardWidth, height: boardWidth }}
       >
         <Chessboard
@@ -229,8 +259,8 @@ export default function ChessBoard({
             boardOrientation: playerSide === "w" ? "white" : "black",
             allowDragging: isActive,
             squareStyles: squareStyles,
-            darkSquareStyle: { backgroundColor: "#5994EF" },
-            lightSquareStyle: { backgroundColor: "#F2F6FA" },
+            darkSquareStyle: { backgroundColor: darkSquareColor },
+            lightSquareStyle: { backgroundColor: lightSquareColor },
             boardStyle: { width: boardWidth, height: boardWidth },
             arrows: arrows,
           }}

@@ -26,7 +26,7 @@ export default function Home() {
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#f44336]/50 to-transparent" />
         </div>
 
-        <div className="max-w-[80rem] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-24">
+        <div className="py-8 sm:py-12 lg:py-16">
           <div className="text-center mb-12 animate-fade-in">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#f44336]/10 border border-[#f44336]/20 text-[#f44336] text-sm font-medium mb-6">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

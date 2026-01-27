@@ -55,7 +55,6 @@ const supabaseAdmin = createClient(
 );
 
 export async function POST(req: NextRequest) {
-  console.log('[stripe-webhook] Received webhook request');
   const body = await req.text();
   const headersList = await headers();
   const signature = headersList.get('stripe-signature')!;
@@ -68,7 +67,6 @@ export async function POST(req: NextRequest) {
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!
     );
-    console.log('[stripe-webhook] Event verified:', event.type);
   } catch (err) {
     console.error('[stripe-webhook] Signature verification failed:', err);
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
@@ -118,9 +116,6 @@ export async function POST(req: NextRequest) {
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  console.log('[stripe-webhook] handleCheckoutCompleted called');
-  console.log('[stripe-webhook] Session:', { id: session.id, customer: session.customer, subscription: session.subscription });
-
   const subscriptionId = session.subscription as string;
   const customerId = session.customer as string;
 
@@ -133,8 +128,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   const userId = subscription.metadata.supabase_user_id;
 
-  console.log('[stripe-webhook] Subscription:', { id: subscription.id, status: subscription.status, userId });
-
   if (!userId) {
     console.error('[stripe-webhook] No supabase_user_id in subscription metadata');
     return;
@@ -142,7 +135,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   // Get period values from subscription items (Stripe moved these in API 2025-03-31)
   const period = getSubscriptionPeriod(subscription);
-  console.log('[stripe-webhook] Period values:', period);
 
   const { error } = await supabaseAdmin
     .from('profiles')
@@ -161,16 +153,12 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   if (error) {
     console.error('[stripe-webhook] Failed to update profile:', error);
     throw error;
-  } else {
-    console.log('[stripe-webhook] Profile updated successfully for user:', userId);
   }
 }
 
 async function handleInvoicePaid(invoice: InvoiceWithSubscription) {
-  console.log('[stripe-webhook] handleInvoicePaid called');
   const subscriptionId = invoice.subscription;
   if (!subscriptionId) {
-    console.log('[stripe-webhook] No subscription ID in invoice, skipping');
     return;
   }
 
@@ -197,16 +185,12 @@ async function handleInvoicePaid(invoice: InvoiceWithSubscription) {
   if (error) {
     console.error('[stripe-webhook] Failed to update profile for invoice.paid:', error);
     throw error;
-  } else {
-    console.log('[stripe-webhook] Invoice paid processed for user:', userId);
   }
 }
 
 async function handlePaymentFailed(invoice: InvoiceWithSubscription) {
-  console.log('[stripe-webhook] handlePaymentFailed called');
   const subscriptionId = invoice.subscription;
   if (!subscriptionId) {
-    console.log('[stripe-webhook] No subscription ID in invoice, skipping');
     return;
   }
 
@@ -229,23 +213,12 @@ async function handlePaymentFailed(invoice: InvoiceWithSubscription) {
   if (error) {
     console.error('[stripe-webhook] Failed to update profile for payment.failed:', error);
     throw error;
-  } else {
-    console.log('[stripe-webhook] Payment failed processed for user:', userId);
   }
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
-  console.log('[stripe-webhook] handleSubscriptionUpdated called');
   const userId = subscription.metadata.supabase_user_id;
   const period = getSubscriptionPeriod(subscription);
-
-  console.log('[stripe-webhook] Subscription update data:', {
-    id: subscription.id,
-    status: subscription.status,
-    userId,
-    cancel_at_period_end: subscription.cancel_at_period_end,
-    period,
-  });
 
   if (!userId) {
     console.error('[stripe-webhook] No supabase_user_id in subscription metadata for subscription.updated');
@@ -267,13 +240,10 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   if (error) {
     console.error('[stripe-webhook] Failed to update subscription:', error);
     throw error;
-  } else {
-    console.log('[stripe-webhook] Subscription updated successfully for user:', userId);
   }
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  console.log('[stripe-webhook] handleSubscriptionDeleted called');
   const userId = subscription.metadata.supabase_user_id;
 
   if (!userId) {
@@ -293,7 +263,5 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   if (error) {
     console.error('[stripe-webhook] Failed to update profile for subscription.deleted:', error);
     throw error;
-  } else {
-    console.log('[stripe-webhook] Subscription deleted processed for user:', userId);
   }
 }

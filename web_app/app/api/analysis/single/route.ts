@@ -134,10 +134,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { gameId, depth: requestedDepth } = body;
-    console.log(`[single] Received request for gameId: ${gameId}`);
 
     if (!gameId) {
-      console.log("[single] No gameId provided");
       return NextResponse.json({ error: "gameId required" }, { status: 400 });
     }
 
@@ -145,7 +143,6 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      console.log("[single] Auth error or no user");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -158,7 +155,6 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (existingAnalysis) {
-      console.log(`[single] Game ${gameId} already analyzed, returning success`);
       return NextResponse.json({
         success: true,
         alreadyAnalyzed: true,
@@ -170,7 +166,6 @@ export async function POST(request: NextRequest) {
     const isPremium = await checkPremiumAccess();
     const maxDepth = isPremium ? MAX_PREMIUM_DEPTH : MAX_FREE_DEPTH;
     const analysisDepth = Math.min(requestedDepth || DEFAULT_ANALYSIS_DEPTH, maxDepth);
-    console.log(`[single] Game ${gameId}: isPremium=${isPremium}, depth=${analysisDepth}`);
 
     // Check retention limit for free users
     if (!isPremium) {
@@ -179,9 +174,7 @@ export async function POST(request: NextRequest) {
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id);
 
-      console.log(`[single] Game ${gameId}: current analysis count=${count}, limit=${MAX_FREE_ANALYSES}`);
       if ((count || 0) >= MAX_FREE_ANALYSES) {
-        console.log(`[single] Game ${gameId}: LIMIT REACHED`);
         return NextResponse.json({
           error: "Free analysis limit reached",
           limitReached: true,
@@ -198,11 +191,9 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (gameError || !game) {
-      console.log(`[single] Game ${gameId} not found:`, gameError);
       return NextResponse.json({ error: "Game not found" }, { status: 404 });
     }
 
-    console.log(`[single] Game ${gameId}: Starting analysis...`);
     // Analyze the game
     const blunders = await analyzeGame(
       game.pgn,
@@ -212,7 +203,6 @@ export async function POST(request: NextRequest) {
       user.id,
       analysisDepth
     );
-    console.log(`[single] Game ${gameId}: Found ${blunders.length} blunders`);
 
     // Save analysis
     const { error: insertError } = await supabase.from("analysis").insert({
@@ -227,7 +217,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to save analysis" }, { status: 500 });
     }
 
-    console.log(`[single] Game ${gameId}: Analysis saved successfully`);
     return NextResponse.json({
       success: true,
       blunders,

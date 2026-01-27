@@ -95,32 +95,19 @@ function AnalysisContent() {
   const analyzeAll = async () => {
     setAnalyzing(true);
     abortRef.current = false;
-    console.log("[analyzeAll] Starting analysis...");
 
     try {
       // Fetch unanalyzed games
-      console.log("[analyzeAll] Fetching unanalyzed games...");
       const response = await fetch("/api/analysis/unanalyzed");
       const data = await response.json();
-      console.log("[analyzeAll] Unanalyzed response:", {
-        ok: response.ok,
-        total: data.total,
-        alreadyAnalyzed: data.alreadyAnalyzed,
-        gamesCount: data.games?.length,
-        limitReached: data.limitReached,
-        remainingSlots: data.remainingSlots,
-        isPremium: data.isPremium
-      });
 
       if (!response.ok) {
-        console.log("[analyzeAll] Response not OK:", data.error);
         toast.error(data.error || "Failed to fetch games");
         setAnalyzing(false);
         return;
       }
 
       if (data.limitReached) {
-        console.log("[analyzeAll] Limit reached, stopping");
         setRetentionLimitReached(true);
         toast.error("Free analysis limit reached");
         setAnalyzing(false);
@@ -128,10 +115,8 @@ function AnalysisContent() {
       }
 
       const unanalyzedGames: UnanalyzedGame[] = data.games || [];
-      console.log("[analyzeAll] Unanalyzed games IDs:", unanalyzedGames.map(g => g.id));
 
       if (unanalyzedGames.length === 0) {
-        console.log("[analyzeAll] No unanalyzed games found!");
         toast.info("All games are already analyzed!");
         setAnalyzing(false);
         return;
@@ -139,7 +124,6 @@ function AnalysisContent() {
 
       const totalToAnalyze = unanalyzedGames.length;
       const startingCount = data.alreadyAnalyzed || 0;
-      console.log("[analyzeAll] Starting count:", startingCount, "Total to analyze:", totalToAnalyze);
 
       setAnalyzeProgress({
         current: startingCount,
@@ -152,13 +136,11 @@ function AnalysisContent() {
       // Process in batches
       for (let i = 0; i < unanalyzedGames.length; i += BATCH_SIZE) {
         if (abortRef.current) {
-          console.log("[analyzeAll] Aborted by user");
           toast.info(`Analysis stopped. ${analyzed} games analyzed.`);
           break;
         }
 
         const batch = unanalyzedGames.slice(i, i + BATCH_SIZE);
-        console.log(`[analyzeAll] Processing batch ${i / BATCH_SIZE + 1}, games:`, batch.map(g => g.id));
 
         const results = await Promise.allSettled(
           batch.map(game =>
@@ -170,21 +152,12 @@ function AnalysisContent() {
           )
         );
 
-        console.log(`[analyzeAll] Batch results:`, results.map((r, idx) => ({
-          gameId: batch[idx].id,
-          status: r.status,
-          value: r.status === "fulfilled" ? r.value : null,
-          reason: r.status === "rejected" ? r.reason : null
-        })));
-
         for (const result of results) {
           if (result.status === "fulfilled" && result.value.success) {
             analyzed++;
           } else {
             failed++;
-            console.log("[analyzeAll] Failed result:", result);
             if (result.status === "fulfilled" && result.value.limitReached) {
-              console.log("[analyzeAll] Limit reached during batch!");
               setRetentionLimitReached(true);
               toast.error("Free analysis limit reached");
               abortRef.current = true;
@@ -193,7 +166,6 @@ function AnalysisContent() {
           }
         }
 
-        console.log(`[analyzeAll] After batch: analyzed=${analyzed}, failed=${failed}`);
         setAnalyzeProgress({
           current: startingCount + analyzed + failed,
           total: startingCount + totalToAnalyze
@@ -205,7 +177,6 @@ function AnalysisContent() {
         }
       }
 
-      console.log(`[analyzeAll] Finished! analyzed=${analyzed}, failed=${failed}, aborted=${abortRef.current}`);
       if (!abortRef.current) {
         toast.success(`Analysis complete! ${analyzed} games analyzed.`);
       }
@@ -235,7 +206,7 @@ function AnalysisContent() {
 
   if (selectedAnalysis) {
     return (
-      <div>
+      <div className="max-w-6xl mx-auto">
         <button
           onClick={() => setSelectedAnalysis(null)}
           className="text-[#f44336] hover:text-[#f44336]/80 mb-6 inline-flex items-center gap-2 text-sm font-medium transition-colors"
@@ -320,7 +291,7 @@ function AnalysisContent() {
   }
 
   return (
-    <div>
+    <div className="max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#f5f5f5]">Analysis</h1>
         <div className="flex gap-3">
@@ -469,7 +440,7 @@ function AnalysisContent() {
                   </div>
                   <div className="flex items-center gap-2 text-xs text-[#b4b4b4] mb-2">
                     <span className="capitalize">{game?.time_class || 'Unknown'}</span>
-                    <span>•</span>
+                    <span>-</span>
                     <span>{game?.played_at ? new Date(game.played_at).toLocaleDateString() : '-'}</span>
                   </div>
                   <div className="flex items-center justify-between">

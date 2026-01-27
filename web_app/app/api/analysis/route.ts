@@ -119,10 +119,5 @@ async function analyzeGame(
   threshold: number
 ) {
   // TODO: Implement actual analysis using chess.js + engine API
-  console.log(
-    `Analyzing game for ${userColor} with threshold ${threshold}cp`
-  );
-  console.log(`PGN length: ${pgn.length}`);
-
   return [];
 }

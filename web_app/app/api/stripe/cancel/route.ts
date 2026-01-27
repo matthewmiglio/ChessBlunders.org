@@ -25,19 +25,15 @@ export async function POST(req: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    console.log('[stripe-cancel] User:', user.id, 'Subscription ID:', profile?.stripe_subscription_id);
-
     if (!profile?.stripe_subscription_id) {
       return NextResponse.json({ error: 'No subscription found' }, { status: 400 });
     }
 
     // First, check the subscription status in Stripe
     const subscription = await stripe.subscriptions.retrieve(profile.stripe_subscription_id);
-    console.log('[stripe-cancel] Current Stripe status:', subscription.status);
 
     // If already canceled, sync the database and return success
     if (subscription.status === 'canceled') {
-      console.log('[stripe-cancel] Subscription already canceled, syncing database');
       await supabaseAdmin
         .from('profiles')
         .update({
@@ -51,16 +47,13 @@ export async function POST(req: NextRequest) {
 
     // If already set to cancel at period end, return success
     if (subscription.cancel_at_period_end) {
-      console.log('[stripe-cancel] Already set to cancel at period end');
       return NextResponse.json({ success: true });
     }
 
     // Cancel at period end (user keeps access until billing period ends)
-    const updated = await stripe.subscriptions.update(profile.stripe_subscription_id, {
+    await stripe.subscriptions.update(profile.stripe_subscription_id, {
       cancel_at_period_end: true,
     });
-
-    console.log('[stripe-cancel] Success, cancel_at_period_end:', updated.cancel_at_period_end);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
