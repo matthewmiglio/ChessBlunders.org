@@ -102,14 +102,16 @@ export default function GamesPage() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#f5f5f5]">Your Games</h1>
+      {/* Header */}
+      <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#f5f5f5] mb-4">Your Games</h1>
 
+      {/* Controls */}
+      <div className="flex flex-col gap-3 mb-6">
         <div className="flex items-center gap-3">
           <select
             value={importCount}
             onChange={(e) => setImportCount(e.target.value)}
-            className="bg-[#3c3c3c]/30 border border-white/10 rounded-md px-4 py-2.5 text-sm text-[#b4b4b4] focus:outline-none focus:ring-2 focus:ring-[#f44336] focus:border-transparent transition-all"
+            className="flex-1 sm:flex-none bg-[#3c3c3c]/30 border border-white/10 rounded-md pl-4 pr-8 py-2.5 text-sm text-[#b4b4b4] focus:outline-none focus:ring-2 focus:ring-[#f44336] focus:border-transparent transition-all"
           >
             <option value="25" className="bg-[#2a2a2a] text-[#f5f5f5]">Last 25 games</option>
             <option value="50" className="bg-[#2a2a2a] text-[#f5f5f5]">Last 50 games</option>
@@ -135,18 +137,18 @@ export default function GamesPage() {
                 Importing...
               </>
             ) : (
-              "Import Games"
+              "Import"
             )}
           </button>
-          {games.length > 0 && (
-            <Link
-              href="/analysis"
-              className="inline-flex items-center justify-center rounded-md bg-[#f44336] px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#f44336]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#f44336] transition-all"
-            >
-              Analyze
-            </Link>
-          )}
         </div>
+        {games.length > 0 && (
+          <Link
+            href="/analysis"
+            className="inline-flex items-center justify-center rounded-md bg-[#f44336] px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#f44336]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#f44336] transition-all w-full sm:w-auto"
+          >
+            Analyze
+          </Link>
+        )}
       </div>
 
       <GamesTable games={games} />

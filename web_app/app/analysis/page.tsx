@@ -61,6 +61,13 @@ function AnalysisContent() {
     }
   }, [analysisId, analyses]);
 
+  // Scroll to top when viewing blunder details
+  useEffect(() => {
+    if (selectedAnalysis) {
+      window.scrollTo(0, 0);
+    }
+  }, [selectedAnalysis]);
+
   const fetchStats = async () => {
     try {
       const response = await fetch("/api/analysis/stats");
@@ -247,8 +254,13 @@ function AnalysisContent() {
               {selectedAnalysis.blunders.map((blunder: Blunder, index: number) => (
                 <div
                   key={index}
-                  className="bg-[#3c3c3c]/50 border border-white/10 rounded-md p-4 hover:border-white/20 transition-colors"
+                  className="bg-[#3c3c3c]/50 border border-white/10 rounded-md p-4 hover:border-white/20 transition-colors relative"
                 >
+                  {/* Eval drop - top right on mobile */}
+                  <span className="absolute top-3 right-3 text-[#f44336] font-semibold text-sm whitespace-nowrap sm:hidden">
+                    -{blunder.eval_drop} cp
+                  </span>
+
                   <div className="flex gap-4 items-center">
                     <div className="flex-shrink-0">
                       <BoardPreview fen={blunder.fen} size={100} />
@@ -256,7 +268,8 @@ function AnalysisContent() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="font-medium text-[#f5f5f5]">Move {blunder.move_number}</span>
-                        <span className="text-[#f44336] font-semibold text-sm">
+                        {/* Eval drop - inline on desktop */}
+                        <span className="text-[#f44336] font-semibold text-sm whitespace-nowrap hidden sm:inline">
                           -{blunder.eval_drop} cp
                         </span>
                       </div>
@@ -269,7 +282,7 @@ function AnalysisContent() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex-shrink-0">
+                    <div className="flex-shrink-0 hidden sm:block">
                       <Link
                         href={`/practice?analysisId=${selectedAnalysis.id}&blunderIndex=${index}&clearFilters=true`}
                         className="inline-flex items-center justify-center rounded-md bg-[#18be5d] px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-[#18be5d]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#18be5d] transition-all"
@@ -278,6 +291,14 @@ function AnalysisContent() {
                       </Link>
                     </div>
                   </div>
+
+                  {/* Practice button - full width on mobile */}
+                  <Link
+                    href={`/practice?analysisId=${selectedAnalysis.id}&blunderIndex=${index}&clearFilters=true`}
+                    className="mt-3 w-full inline-flex items-center justify-center rounded-md bg-[#18be5d] px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-[#18be5d]/90 sm:hidden"
+                  >
+                    Practice
+                  </Link>
                 </div>
               ))}
             </div>
@@ -422,7 +443,12 @@ function AnalysisContent() {
                 <div className="sm:hidden">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <span className={`w-3 h-3 rounded-full ${game?.user_color === 'white' ? 'bg-white' : 'bg-gray-800 border border-gray-600'}`} />
+                      <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill={game?.user_color === 'white' ? '#ffffff' : '#1a1a1a'} stroke={game?.user_color === 'white' ? 'none' : '#666666'} strokeWidth="1">
+                        <circle cx="12" cy="5" r="3" />
+                        <path d="M9 8.5C9 8.5 8 10 8 12C8 14 9 15 9 15H15C15 15 16 14 16 12C16 10 15 8.5 15 8.5H9Z" />
+                        <path d="M7 15L6 20H18L17 15H7Z" />
+                        <rect x="5" y="20" width="14" height="2" rx="0.5" />
+                      </svg>
                       <span className="font-medium text-[#f5f5f5] truncate max-w-[140px]">
                         {game?.opponent || 'Unknown'}
                       </span>
@@ -455,8 +481,13 @@ function AnalysisContent() {
 
                 {/* Desktop Layout */}
                 <div className="hidden sm:flex items-center gap-4">
-                  {/* Color indicator */}
-                  <span className={`w-4 h-4 rounded-full flex-shrink-0 ${game?.user_color === 'white' ? 'bg-white' : 'bg-gray-800 border border-gray-600'}`} />
+                  {/* Color indicator - pawn icon */}
+                  <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill={game?.user_color === 'white' ? '#ffffff' : '#1a1a1a'} stroke={game?.user_color === 'white' ? 'none' : '#666666'} strokeWidth="1">
+                    <circle cx="12" cy="5" r="3" />
+                    <path d="M9 8.5C9 8.5 8 10 8 12C8 14 9 15 9 15H15C15 15 16 14 16 12C16 10 15 8.5 15 8.5H9Z" />
+                    <path d="M7 15L6 20H18L17 15H7Z" />
+                    <rect x="5" y="20" width="14" height="2" rx="0.5" />
+                  </svg>
 
                   {/* Opponent & Result */}
                   <div className="flex-1 min-w-0">

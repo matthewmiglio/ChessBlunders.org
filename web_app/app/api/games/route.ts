@@ -7,37 +7,67 @@ const MAX_PREMIUM_GAMES = 1000;
 
 // GET /api/games - Fetch user's games
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const searchParams = request.nextUrl.searchParams;
+    const limitParam = searchParams.get("limit");
+    const offset = parseInt(searchParams.get("offset") || "0");
+
+    // Build query for games
+    let query = supabase
+      .from("games")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("played_at", { ascending: false });
+
+    // Only apply range if limit is specified (otherwise fetch all)
+    if (limitParam) {
+      const limit = parseInt(limitParam);
+      query = query.range(offset, offset + limit - 1);
+    }
+
+    const { data: games, error: gamesError } = await query;
+
+    if (gamesError) {
+      console.error("[GET /api/games] Games fetch error:", gamesError.message);
+      return NextResponse.json({ error: "Failed to fetch games" }, { status: 500 });
+    }
+
+    // Fetch analysis records separately to get analysis_id for each game
+    const gameIds = games?.map(g => g.id) || [];
+    let analysisMap: Record<string, string> = {};
+
+    if (gameIds.length > 0) {
+      const { data: analysisRecords, error: analysisError } = await supabase
+        .from("analysis")
+        .select("id, game_id")
+        .in("game_id", gameIds);
+
+      if (analysisError) {
+        console.error("[GET /api/games] Analysis fetch error:", analysisError.message);
+        // Continue without analysis data rather than failing
+      } else if (analysisRecords) {
+        analysisMap = Object.fromEntries(analysisRecords.map(a => [a.game_id, a.id]));
+      }
+    }
+
+    // Merge analysis_id into games
+    const gamesWithAnalysis = games?.map(game => ({
+      ...game,
+      analysis_id: analysisMap[game.id] || null,
+    }));
+
+    return NextResponse.json({ games: gamesWithAnalysis });
+  } catch (err) {
+    console.error("[GET /api/games] Unexpected error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  const searchParams = request.nextUrl.searchParams;
-  const limitParam = searchParams.get("limit");
-  const offset = parseInt(searchParams.get("offset") || "0");
-
-  // Build query
-  let query = supabase
-    .from("games")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("played_at", { ascending: false });
-
-  // Only apply range if limit is specified (otherwise fetch all)
-  if (limitParam) {
-    const limit = parseInt(limitParam);
-    query = query.range(offset, offset + limit - 1);
-  }
-
-  const { data: games, error } = await query;
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ games });
 }
 
 // POST /api/games - Import games from Chess.com

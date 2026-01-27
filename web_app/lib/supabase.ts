@@ -28,6 +28,7 @@ export interface Game {
   result: string | null;
   played_at: string | null;
   created_at: string;
+  analysis_id?: string | null;
 }
 
 export interface TopMove {

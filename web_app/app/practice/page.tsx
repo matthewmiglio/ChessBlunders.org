@@ -519,7 +519,7 @@ function PracticeContent() {
         <div className="flex flex-col lg:flex-row lg:items-stretch gap-4">
           {/* Left: Statistics Card */}
           <div
-            className="flex-shrink-0 order-2 lg:order-1"
+            className="flex-shrink-0 order-3 lg:order-1"
             style={{ width: isDesktop ? cardWidth : '100%', height: isDesktop ? boardSize : 'auto' }}
           >
             <div
@@ -712,7 +712,7 @@ function PracticeContent() {
 
           {/* Right: Info Panel */}
           <div
-            className="flex-shrink-0 order-3"
+            className="flex-shrink-0 order-2 lg:order-3"
             style={{ width: isDesktop ? cardWidth : '100%', height: isDesktop ? boardSize : 'auto' }}
           >
             <div

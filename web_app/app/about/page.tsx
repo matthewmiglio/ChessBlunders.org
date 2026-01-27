@@ -1,6 +1,6 @@
 import Image from "next/image";
-import Link from "next/link";
 import type { Metadata } from "next";
+import { AboutCTA } from "@/components/AboutCTA";
 
 export const metadata: Metadata = {
   title: "About ChessBlunders - Analyze Games & Practice Your Mistakes",
@@ -29,12 +29,12 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <div className="relative overflow-hidden">
-      {/* Background */}
+      {/* Background - gradient only on desktop */}
       <div className="absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-b from-[#141414] via-[#1a1a1a] to-[#141414]" />
+        <div className="absolute inset-0 bg-[#141414] sm:bg-gradient-to-b sm:from-[#141414] sm:via-[#1a1a1a] sm:to-[#141414]" />
       </div>
 
-      <div className="max-w-5xl mx-auto space-y-24 py-8 sm:py-12">
+      <div className="max-w-5xl mx-auto space-y-24 py-4 sm:py-12">
         {/* Hero Section */}
         <section className="space-y-8">
           <div className="relative h-[300px] sm:h-[400px] rounded-xl overflow-hidden">
@@ -122,7 +122,7 @@ export default function AboutPage() {
             ].map((item) => (
               <div
                 key={item.step}
-                className="bg-[#202020] border border-white/10 rounded-lg p-6 space-y-4"
+                className="sm:bg-[#202020] sm:border sm:border-white/10 sm:rounded-lg sm:p-6 space-y-4"
               >
                 <div className="w-10 h-10 rounded-lg bg-[#f44336]/20 flex items-center justify-center">
                   <span className="text-[#f44336] font-semibold">
@@ -255,7 +255,7 @@ export default function AboutPage() {
             ].map((feature) => (
               <div
                 key={feature.title}
-                className="flex gap-4 p-4 bg-[#202020]/50 border border-white/5 rounded-lg hover:border-white/10 transition-colors"
+                className="flex gap-4 sm:p-4 sm:bg-[#202020]/50 sm:border sm:border-white/5 sm:rounded-lg sm:hover:border-white/10 transition-colors"
               >
                 <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-[#3c3c3c] flex items-center justify-center">
                   <svg
@@ -281,31 +281,7 @@ export default function AboutPage() {
         </section>
 
         {/* CTA Section */}
-        <section className="text-center space-y-8 pb-8">
-          <div className="bg-[#202020] border border-white/10 rounded-xl p-8 sm:p-12 space-y-6">
-            <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#f5f5f5]">
-              Ready to improve?
-            </h2>
-            <p className="text-[#b4b4b4] max-w-lg mx-auto">
-              Start analyzing your games and turn your blunders into lessons.
-              Free to get started.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                href="/auth/signin"
-                className="inline-flex items-center justify-center rounded-md bg-[#ebebeb] px-8 py-3.5 text-base font-medium text-[#202020] shadow-sm hover:bg-[#ebebeb]/90 transition-all"
-              >
-                Get Started
-              </Link>
-              <Link
-                href="/"
-                className="inline-flex items-center justify-center rounded-md bg-[#3c3c3c] border border-white/10 px-8 py-3.5 text-base font-medium text-[#f5f5f5] hover:bg-[#3c3c3c]/80 transition-all"
-              >
-                Learn More
-              </Link>
-            </div>
-          </div>
-        </section>
+        <AboutCTA />
       </div>
     </div>
   );

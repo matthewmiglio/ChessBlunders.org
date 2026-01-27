@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import { Game } from "@/lib/supabase";
 
 type SortKey = "played_at" | "opponent" | "user_color" | "result" | "time_class";
@@ -10,6 +11,73 @@ const ITEMS_PER_PAGE = 25;
 
 interface GamesTableProps {
   games: Game[];
+}
+
+function GameCard({ game }: { game: Game }) {
+  const isWin = game.result === "win";
+  const isLoss = ["resigned", "checkmated", "timeout", "abandoned", "loss"].includes(game.result || "");
+  const displayResult = isWin ? "Win" : isLoss ? "Loss" : "Draw";
+  const resultColor = isWin ? "text-[#18be5d]" : isLoss ? "text-[#f44336]" : "text-[#b4b4b4]";
+
+  const truncatedOpponent = game.opponent && game.opponent.length > 8
+    ? game.opponent.slice(0, 8) + "..."
+    : game.opponent;
+
+  const hasAnalysis = !!game.analysis_id;
+
+  return (
+    <div className="bg-[#2a2a2a] border border-white/10 rounded-lg p-3">
+      {/* Row 1: Date | Result */}
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm text-[#b4b4b4]">
+          {game.played_at
+            ? new Date(game.played_at).toLocaleDateString()
+            : "Unknown"}
+        </span>
+        <span className={`text-sm font-medium ${resultColor}`}>
+          {displayResult}
+        </span>
+      </div>
+
+      {/* Row 2: Vs | Opponent | Color | Time Control */}
+      <div className="flex items-center gap-2 text-sm mb-3">
+        <span className="text-[#b4b4b4]">Vs</span>
+        <span className="text-[#f5f5f5] font-medium">{truncatedOpponent}</span>
+        <span
+          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+            game.user_color === "white"
+              ? "bg-[#f5f5f5] text-[#202020]"
+              : "bg-[#3c3c3c] text-[#f5f5f5]"
+          }`}
+        >
+          {game.user_color}
+        </span>
+        <span className="text-[#b4b4b4]/70 capitalize">{game.time_class}</span>
+      </div>
+
+      {/* Row 3: Show Analysis button */}
+      <div className="flex justify-end">
+        {hasAnalysis ? (
+          <Link
+            href={`/analysis?id=${game.analysis_id}`}
+            className="inline-flex items-center gap-1 text-xs font-medium text-[#f44336] hover:text-[#f44336]/80 transition-colors"
+          >
+            Show Analysis
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-[#b4b4b4]/40 cursor-not-allowed">
+            Show Analysis
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function GamesTable({ games }: GamesTableProps) {
@@ -102,105 +170,145 @@ export function GamesTable({ games }: GamesTableProps) {
     { key: "time_class", label: "Time Control" },
   ];
 
-  return (
-    <div className="bg-[#202020] border border-white/10 rounded-lg overflow-hidden">
-      <table className="min-w-full">
-        <thead>
-          <tr className="border-b border-white/10">
-            {columns.map((col) => (
-              <th
-                key={col.key}
-                onClick={() => handleSort(col.key)}
-                className="px-6 py-4 text-left text-xs font-medium text-[#b4b4b4] uppercase tracking-wider cursor-pointer hover:text-[#f5f5f5] hover:bg-white/5 transition-colors select-none"
-              >
-                <div className="flex items-center">
-                  {col.label}
-                  <SortIcon columnKey={col.key} />
-                </div>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-white/5">
-          {paginatedGames.map((game) => (
-            <tr key={game.id} className="hover:bg-white/5 transition-colors">
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-[#b4b4b4]">
-                {game.played_at
-                  ? new Date(game.played_at).toLocaleDateString()
-                  : "Unknown"}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-[#f5f5f5] font-medium">
-                {game.opponent}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm">
-                <span
-                  className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
-                    game.user_color === "white"
-                      ? "bg-[#f5f5f5] text-[#202020]"
-                      : "bg-[#3c3c3c] text-[#f5f5f5]"
-                  }`}
-                >
-                  {game.user_color}
-                </span>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm">
-                <span className={`font-medium ${
-                  game.result === "win" ? "text-[#18be5d]" :
-                  ["resigned", "checkmated", "timeout", "abandoned", "loss"].includes(game.result || "") ? "text-[#f44336]" :
-                  "text-[#b4b4b4]"
-                }`}>
-                  {game.result}
-                </span>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-[#b4b4b4]/70">
-                {game.time_class}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between px-6 py-4 border-t border-white/10">
-          <p className="text-sm text-[#b4b4b4]">
-            Showing {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, sortedGames.length)} of {sortedGames.length} games
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCurrentPage(1)}
-              disabled={currentPage === 1}
-              className="px-3 py-1.5 text-sm text-[#b4b4b4] hover:text-[#f5f5f5] hover:bg-white/5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              First
-            </button>
-            <button
-              onClick={() => setCurrentPage(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="px-3 py-1.5 text-sm text-[#b4b4b4] hover:text-[#f5f5f5] hover:bg-white/5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-            <span className="px-3 py-1.5 text-sm text-[#f5f5f5]">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1.5 text-sm text-[#b4b4b4] hover:text-[#f5f5f5] hover:bg-white/5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
-            <button
-              onClick={() => setCurrentPage(totalPages)}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1.5 text-sm text-[#b4b4b4] hover:text-[#f5f5f5] hover:bg-white/5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Last
-            </button>
-          </div>
+  const Pagination = () => (
+    totalPages > 1 ? (
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-4 border-t border-white/10">
+        <p className="text-sm text-[#b4b4b4]">
+          Showing {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, sortedGames.length)} of {sortedGames.length} games
+        </p>
+        <div className="flex items-center gap-1 sm:gap-2">
+          <button
+            onClick={() => setCurrentPage(1)}
+            disabled={currentPage === 1}
+            className="px-2 sm:px-3 py-1.5 text-sm text-[#b4b4b4] hover:text-[#f5f5f5] hover:bg-white/5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            First
+          </button>
+          <button
+            onClick={() => setCurrentPage(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="px-2 sm:px-3 py-1.5 text-sm text-[#b4b4b4] hover:text-[#f5f5f5] hover:bg-white/5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Prev
+          </button>
+          <span className="px-2 sm:px-3 py-1.5 text-sm text-[#f5f5f5]">
+            {currentPage}/{totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="px-2 sm:px-3 py-1.5 text-sm text-[#b4b4b4] hover:text-[#f5f5f5] hover:bg-white/5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+          <button
+            onClick={() => setCurrentPage(totalPages)}
+            disabled={currentPage === totalPages}
+            className="px-2 sm:px-3 py-1.5 text-sm text-[#b4b4b4] hover:text-[#f5f5f5] hover:bg-white/5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Last
+          </button>
         </div>
-      )}
-    </div>
+      </div>
+    ) : null
+  );
+
+  return (
+    <>
+      {/* Mobile: Card View */}
+      <div className="md:hidden">
+        <div className="space-y-3">
+          {paginatedGames.map((game) => (
+            <GameCard key={game.id} game={game} />
+          ))}
+        </div>
+        <div className="mt-4 bg-[#202020] border border-white/10 rounded-lg">
+          <Pagination />
+        </div>
+      </div>
+
+      {/* Desktop: Table View */}
+      <div className="hidden md:block bg-[#202020] border border-white/10 rounded-lg overflow-hidden">
+        <table className="min-w-full">
+          <thead>
+            <tr className="border-b border-white/10">
+              {columns.map((col) => (
+                <th
+                  key={col.key}
+                  onClick={() => handleSort(col.key)}
+                  className="px-6 py-4 text-left text-xs font-medium text-[#b4b4b4] uppercase tracking-wider cursor-pointer hover:text-[#f5f5f5] hover:bg-white/5 transition-colors select-none"
+                >
+                  <div className="flex items-center">
+                    {col.label}
+                    <SortIcon columnKey={col.key} />
+                  </div>
+                </th>
+              ))}
+              <th className="px-6 py-4 text-left text-xs font-medium text-[#b4b4b4] uppercase tracking-wider">
+                Analysis
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {paginatedGames.map((game) => (
+              <tr key={game.id} className="hover:bg-white/5 transition-colors">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-[#b4b4b4]">
+                  {game.played_at
+                    ? new Date(game.played_at).toLocaleDateString()
+                    : "Unknown"}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-[#f5f5f5] font-medium">
+                  {game.opponent}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <span
+                    className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
+                      game.user_color === "white"
+                        ? "bg-[#f5f5f5] text-[#202020]"
+                        : "bg-[#3c3c3c] text-[#f5f5f5]"
+                    }`}
+                  >
+                    {game.user_color}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <span className={`font-medium ${
+                    game.result === "win" ? "text-[#18be5d]" :
+                    ["resigned", "checkmated", "timeout", "abandoned", "loss"].includes(game.result || "") ? "text-[#f44336]" :
+                    "text-[#b4b4b4]"
+                  }`}>
+                    {game.result}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-[#b4b4b4]/70">
+                  {game.time_class}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  {game.analysis_id ? (
+                    <Link
+                      href={`/analysis?id=${game.analysis_id}`}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-[#f44336] hover:text-[#f44336]/80 transition-colors"
+                    >
+                      Show Analysis
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </Link>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-[#b4b4b4]/40 cursor-not-allowed">
+                      Show Analysis
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <Pagination />
+      </div>
+    </>
   );
 }
