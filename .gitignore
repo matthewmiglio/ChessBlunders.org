@@ -36,6 +36,12 @@ local_python/config.json
 # Stripe CLI config (contains API keys)
 stripe/config.json
 
+# Vercel CLI config (contains API keys)
+vercel/config.json
+
+# Supabase CLI config (contains API keys)
+supabase/config.json
+
 # web_app (Next.js)
 web_app/node_modules/
 web_app/.next/
