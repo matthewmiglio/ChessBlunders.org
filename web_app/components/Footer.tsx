@@ -12,6 +12,12 @@ export function Footer() {
           </p>
           <div className="flex items-center gap-6">
             <Link
+              href="/about"
+              className="text-sm text-[#b4b4b4] hover:text-[#f5f5f5] transition-colors"
+            >
+              About
+            </Link>
+            <Link
               href="/privacy"
               className="text-sm text-[#b4b4b4] hover:text-[#f5f5f5] transition-colors"
             >
