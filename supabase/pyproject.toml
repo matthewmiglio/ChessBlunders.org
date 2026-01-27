@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "supabase-cli"
+version = "0.1.0"
+description = "ChessBlunders Supabase CLI - Read-only access to project data"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+requests = "^2.31"
+rich = "^13.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
