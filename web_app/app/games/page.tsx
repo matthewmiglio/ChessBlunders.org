@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
@@ -137,6 +138,14 @@ export default function GamesPage() {
               "Import Games"
             )}
           </button>
+          {games.length > 0 && (
+            <Link
+              href="/analysis"
+              className="inline-flex items-center justify-center rounded-md bg-[#f44336] px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#f44336]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#f44336] transition-all"
+            >
+              Analyze
+            </Link>
+          )}
         </div>
       </div>
 
