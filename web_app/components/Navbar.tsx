@@ -49,14 +49,28 @@ export function Navbar() {
                   {link.label}
                 </Link>
               ))}
+              <Link
+                href="/about"
+                className="text-[#b4b4b4] hover:text-[#f5f5f5] hover:bg-white/5 transition-colors text-xl font-medium py-2.5 px-3 rounded-md"
+              >
+                About
+              </Link>
             </div>
           ) : (
-            <Link
-              href="/auth/signin"
-              className="block text-center rounded-md bg-[#ebebeb] px-4 py-2 text-sm font-medium text-[#202020] shadow-sm hover:bg-[#ebebeb]/90 transition-all mx-2"
-            >
-              Sign In
-            </Link>
+            <div className="flex flex-col gap-2">
+              <Link
+                href="/auth/signin"
+                className="block text-center rounded-md bg-[#ebebeb] px-4 py-2 text-sm font-medium text-[#202020] shadow-sm hover:bg-[#ebebeb]/90 transition-all mx-2"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/about"
+                className="text-[#b4b4b4] hover:text-[#f5f5f5] hover:bg-white/5 transition-colors text-xl font-medium py-2.5 px-3 rounded-md"
+              >
+                About
+              </Link>
+            </div>
           )}
         </nav>
 
@@ -136,6 +150,13 @@ export function Navbar() {
                       {link.label}
                     </Link>
                   ))}
+                  <Link
+                    href="/about"
+                    className="text-[#b4b4b4] hover:text-[#f5f5f5] hover:bg-white/5 transition-colors text-base font-medium py-3 px-3 rounded-md"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    About
+                  </Link>
                   <div className="mt-3 pt-3 border-t border-white/10">
                     <div className="px-3 py-2 text-sm text-[#b4b4b4]">
                       Signed in as <span className="text-[#f5f5f5]">{profile?.chess_username || user.email}</span>
@@ -152,13 +173,22 @@ export function Navbar() {
                   </div>
                 </div>
               ) : (
-                <Link
-                  href="/auth/signin"
-                  className="block text-center rounded-md bg-[#ebebeb] px-4 py-3 text-sm font-medium text-[#202020] shadow-sm hover:bg-[#ebebeb]/90 transition-all"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Sign In
-                </Link>
+                <div className="flex flex-col gap-2">
+                  <Link
+                    href="/auth/signin"
+                    className="block text-center rounded-md bg-[#ebebeb] px-4 py-3 text-sm font-medium text-[#202020] shadow-sm hover:bg-[#ebebeb]/90 transition-all"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/about"
+                    className="text-[#b4b4b4] hover:text-[#f5f5f5] hover:bg-white/5 transition-colors text-base font-medium py-3 px-3 rounded-md"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    About
+                  </Link>
+                </div>
               )}
             </div>
           )}
