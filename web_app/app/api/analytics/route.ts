@@ -1,7 +1,13 @@
-import { createClient } from "@/lib/supabase-server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import crypto from "crypto";
+
+// Use service role to bypass RLS for anonymous analytics tracking
+const supabaseAdmin = createSupabaseClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(request: NextRequest) {
   console.log("[Analytics API] POST request received");
@@ -38,9 +44,6 @@ export async function POST(request: NextRequest) {
 
     console.log("[Analytics API] Geo data:", { city, state, country });
 
-    const supabase = await createClient();
-    console.log("[Analytics API] Supabase client created");
-
     const insertData = {
       path,
       referrer,
@@ -55,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     console.log("[Analytics API] Inserting data:", insertData);
 
-    const { data, error } = await supabase.from("analytics").insert(insertData).select();
+    const { data, error } = await supabaseAdmin.from("analytics").insert(insertData).select();
 
     if (error) {
       console.error("[Analytics API] Supabase insert error:", {
