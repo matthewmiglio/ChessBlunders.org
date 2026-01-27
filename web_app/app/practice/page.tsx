@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, Suspense, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
@@ -440,12 +441,12 @@ function PracticeContent() {
           No blunders to practice yet. Analyze some games first to find
           positions to train on.
         </p>
-        <button
-          onClick={() => router.push("/games")}
+        <Link
+          href="/games"
           className="inline-flex items-center justify-center rounded-md bg-[#ebebeb] px-6 py-3 text-sm font-medium text-[#202020] shadow-sm hover:bg-[#ebebeb]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8c8c8c] transition-all"
         >
           Go to Games
-        </button>
+        </Link>
       </div>
     );
   }
@@ -504,12 +505,12 @@ function PracticeContent() {
                 "Start New Practice Run"
               )}
             </button>
-            <button
-              onClick={() => router.push("/games")}
+            <Link
+              href="/games"
               className="inline-flex items-center justify-center rounded-md border border-white/20 bg-transparent px-5 py-2.5 text-sm font-medium text-[#b4b4b4] hover:bg-white/5 hover:text-[#f5f5f5] transition-colors"
             >
               Import More Games
-            </button>
+            </Link>
           </div>
         </div>
       )}

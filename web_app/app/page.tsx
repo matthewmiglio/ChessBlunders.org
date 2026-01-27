@@ -1,11 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 
 export default function Home() {
   const { user, profile, loading } = useAuth();
-  const router = useRouter();
 
   if (loading) {
     return (
@@ -51,27 +50,27 @@ export default function Home() {
                   Welcome back, <span className="text-[#f44336] font-medium">{profile?.chess_username || user.email}</span>
                 </p>
                 <div className="flex gap-4 justify-center flex-wrap">
-                  <button
-                    onClick={() => router.push("/games")}
+                  <Link
+                    href="/games"
                     className="inline-flex items-center justify-center rounded-md bg-[#ebebeb] px-8 py-3.5 text-base font-medium text-[#202020] shadow-sm hover:bg-[#ebebeb]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8c8c8c] transition-all"
                   >
                     View Games
-                  </button>
-                  <button
-                    onClick={() => router.push("/practice")}
+                  </Link>
+                  <Link
+                    href="/practice"
                     className="inline-flex items-center justify-center rounded-md bg-[#3c3c3c] border border-white/10 px-8 py-3.5 text-base font-medium text-[#f5f5f5] hover:bg-[#3c3c3c]/80 transition-all"
                   >
                     Practice
-                  </button>
+                  </Link>
                 </div>
               </div>
             ) : (
-              <button
-                onClick={() => router.push("/auth/signin")}
+              <Link
+                href="/auth/signin"
                 className="inline-flex items-center justify-center rounded-md bg-[#ebebeb] px-10 py-4 text-base font-medium text-[#202020] shadow-sm hover:bg-[#ebebeb]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8c8c8c] transition-all"
               >
                 Analyze My Games
-              </button>
+              </Link>
             )}
           </div>
 

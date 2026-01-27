@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
@@ -269,16 +270,12 @@ function AnalysisContent() {
                       </div>
                     </div>
                     <div className="flex-shrink-0">
-                      <button
-                        onClick={() =>
-                          router.push(
-                            `/practice?analysisId=${selectedAnalysis.id}&blunderIndex=${index}&clearFilters=true`
-                          )
-                        }
+                      <Link
+                        href={`/practice?analysisId=${selectedAnalysis.id}&blunderIndex=${index}&clearFilters=true`}
                         className="inline-flex items-center justify-center rounded-md bg-[#18be5d] px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-[#18be5d]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#18be5d] transition-all"
                       >
                         Practice
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 </div>

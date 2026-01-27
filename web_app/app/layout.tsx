@@ -23,8 +23,32 @@ const cinzel = Cinzel({
 });
 
 export const metadata: Metadata = {
-  title: "ChessBlunders.org",
-  description: "Learn from your chess mistakes",
+  title: "ChessBlunders.org - Learn From Your Chess Mistakes",
+  description:
+    "Analyze your chess games with Stockfish 16 to find blunders, then practice them as puzzles. Turn your mistakes into improvement.",
+  metadataBase: new URL("https://chessblunders.org"),
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "ChessBlunders.org - Learn From Your Chess Mistakes",
+    description:
+      "Analyze your chess games with Stockfish 16 to find blunders, then practice them as puzzles. Turn your mistakes into improvement.",
+    url: "https://chessblunders.org",
+    siteName: "ChessBlunders.org",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ChessBlunders.org - Learn From Your Chess Mistakes",
+    description:
+      "Analyze your chess games with Stockfish 16 to find blunders, then practice them as puzzles.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
