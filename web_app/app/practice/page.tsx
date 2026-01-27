@@ -8,18 +8,9 @@ import { FilterCounts } from "@/lib/puzzle-filters";
 import { Chess } from "chess.js";
 import ChessBoard, { BOARD_THEMES } from "@/components/ChessBoard";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
-import { StatCard } from "@/components/StatCard";
 import { Puzzle } from "@/app/api/practice/puzzles/route";
 import { toast } from "sonner";
 
-
-interface UserStats {
-  total_games: number;
-  analyzed_games: number;
-  total_blunders: number;
-  solved_blunders: number;
-  total_attempts: number;
-}
 
 interface DetailedStats {
   currentRun: number;
@@ -146,8 +137,6 @@ function PracticeContent() {
     userMove?: string;
     rank?: MoveRank;
   } | null>(null);
-  const [stats, setStats] = useState<UserStats | null>(null);
-  const [loading, setLoading] = useState(true);
   const [puzzlesLoading, setPuzzlesLoading] = useState(false);
   const [expectedMoveUci, setExpectedMoveUci] = useState<string>("");
   const [showHint, setShowHint] = useState(false);
@@ -245,7 +234,6 @@ function PracticeContent() {
 
   useEffect(() => {
     if (user) {
-      fetchStats();
       fetchDetailedStats();
       fetchPuzzles();
     }
@@ -262,18 +250,6 @@ function PracticeContent() {
       setPuzzleStartTime(Date.now());
     }
   }, [currentBlunder]);
-
-  const fetchStats = async () => {
-    try {
-      const userRes = await fetch("/api/user");
-      const userData = await userRes.json();
-      setStats(userData.stats);
-    } catch (error) {
-      console.error("Error fetching stats:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchDetailedStats = async () => {
     try {
@@ -382,11 +358,6 @@ function PracticeContent() {
         }),
       });
 
-      // Refresh stats
-      const userRes = await fetch("/api/user");
-      const userData = await userRes.json();
-      setStats(userData.stats);
-
       // Refresh detailed stats
       fetchDetailedStats();
     } catch (error) {
@@ -423,7 +394,6 @@ function PracticeContent() {
         setSolveTimes([]);
         // Refresh puzzles and stats
         await fetchPuzzles();
-        await fetchStats();
         await fetchDetailedStats();
       } else {
         toast.error(data.error || "Failed to start new run");
@@ -495,27 +465,6 @@ function PracticeContent() {
 
   return (
     <div>
-      {stats && (
-        <div className="mb-6">
-          {currentPracticeRun > 1 && (
-            <div className="text-sm text-[#b4b4b4] mb-3">
-              Practice Run #{currentPracticeRun}
-            </div>
-          )}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl">
-            <StatCard label="Total Blunders" value={stats.total_blunders} centered />
-            <StatCard label="Solved" value={stats.solved_blunders} valueColor="text-[#18be5d]" centered />
-            <StatCard label="Total Attempts" value={stats.total_attempts} centered />
-            <StatCard
-              label="Success Rate"
-              value={`${stats.total_attempts > 0 ? Math.round((stats.solved_blunders / stats.total_attempts) * 100) : 0}%`}
-              valueColor="text-[#f44336]"
-              centered
-            />
-          </div>
-        </div>
-      )}
-
       {/* All puzzles solved message */}
       {!puzzlesLoading && puzzles.length === 0 && filterCounts && filterCounts.all > 0 && (
         <div className="bg-[#202020] border border-white/10 rounded-lg p-8 text-center">
