@@ -39,7 +39,6 @@ export async function GET() {
 
     return NextResponse.json({ invoices: invoiceData });
   } catch (error) {
-    console.error('Invoices error:', error);
     return NextResponse.json({ error: 'Failed to fetch invoices' }, { status: 500 });
   }
 }

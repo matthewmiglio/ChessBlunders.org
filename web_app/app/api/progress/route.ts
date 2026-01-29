@@ -69,7 +69,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Error recording progress:", error);
     return NextResponse.json(
       { error: "Failed to record progress" },
       { status: 500 }

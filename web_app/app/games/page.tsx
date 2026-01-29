@@ -45,7 +45,6 @@ export default function GamesPage() {
         );
       }
     } catch (error) {
-      console.error("Error fetching premium status:", error);
     }
   };
 
@@ -55,7 +54,6 @@ export default function GamesPage() {
       const data = await response.json();
       setGames(data.games || []);
     } catch (error) {
-      console.error("Error fetching games:", error);
     } finally {
       setLoading(false);
     }
@@ -89,7 +87,6 @@ export default function GamesPage() {
         toast.error(data.error || "Failed to import games");
       }
     } catch (error) {
-      console.error("Error importing games:", error);
       toast.error("Failed to import games");
     } finally {
       setImporting(false);

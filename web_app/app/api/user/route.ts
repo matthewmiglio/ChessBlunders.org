@@ -84,7 +84,6 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true, chessUsername });
   } catch (error) {
-    console.error("Error updating username:", error);
     return NextResponse.json(
       { error: "Failed to update profile" },
       { status: 500 }

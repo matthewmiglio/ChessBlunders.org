@@ -84,7 +84,6 @@ function AnalysisContent() {
         setRetentionLimitReached(false);
       }
     } catch (error) {
-      console.error("Error fetching stats:", error);
     }
   };
 
@@ -94,7 +93,6 @@ function AnalysisContent() {
       const data = await response.json();
       setAnalyses(data.analyses || []);
     } catch (error) {
-      console.error("Error fetching analyses:", error);
     } finally {
       setLoading(false);
     }
@@ -194,7 +192,6 @@ function AnalysisContent() {
       await fetchStats();
 
     } catch (error) {
-      console.error("[analyzeAll] Error:", error);
       toast.error("Analysis failed");
     } finally {
       setAnalyzing(false);

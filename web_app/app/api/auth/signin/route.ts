@@ -28,7 +28,6 @@ export async function POST(request: NextRequest) {
       user: data.user,
     });
   } catch (error) {
-    console.error("Signin error:", error);
     return NextResponse.json(
       { error: "Failed to sign in" },
       { status: 500 }

@@ -57,17 +57,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    console.error('[stripe-cancel] Error:', error);
-
     // Handle Stripe-specific errors
     if (error instanceof Stripe.errors.StripeError) {
-      console.error('[stripe-cancel] Stripe error type:', error.type, 'code:', error.code, 'message:', error.message);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     // Handle generic errors
     if (error instanceof Error) {
-      console.error('[stripe-cancel] Generic error:', error.name, error.message);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 

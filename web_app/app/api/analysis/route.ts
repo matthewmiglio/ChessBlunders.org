@@ -104,7 +104,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ analysis });
   } catch (error) {
-    console.error("Analysis error:", error);
     return NextResponse.json(
       { error: "Analysis failed" },
       { status: 500 }

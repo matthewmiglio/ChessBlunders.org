@@ -33,11 +33,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    console.error('[stripe-reactivate] Error:', error);
-
     // Handle Stripe-specific errors
     if (error instanceof Stripe.errors.StripeError) {
-      console.error('[stripe-reactivate] Stripe error type:', error.type, 'code:', error.code);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 

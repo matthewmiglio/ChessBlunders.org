@@ -72,7 +72,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(analysis);
   } catch (error) {
-    console.error("Engine error:", error);
     return NextResponse.json(
       { error: "Engine analysis failed" },
       { status: 500 }

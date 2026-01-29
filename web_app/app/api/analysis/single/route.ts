@@ -51,7 +51,6 @@ async function evaluatePosition(fen: string, depth: number): Promise<EvalResult 
       topMoves,
     };
   } catch (error) {
-    console.error("Lambda evaluation error:", error);
     return null;
   }
 }
@@ -70,7 +69,6 @@ async function analyzeGame(
   try {
     chess.loadPgn(pgn);
   } catch (error) {
-    console.error("Failed to parse PGN:", error);
     return [];
   }
 
@@ -213,7 +211,6 @@ export async function POST(request: NextRequest) {
     });
 
     if (insertError) {
-      console.error(`[single] Game ${gameId}: Failed to save analysis:`, insertError);
       return NextResponse.json({ error: "Failed to save analysis" }, { status: 500 });
     }
 
@@ -224,7 +221,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error("[single] Analysis error:", error);
     return NextResponse.json({
       error: "Analysis failed",
       details: error instanceof Error ? error.message : String(error)

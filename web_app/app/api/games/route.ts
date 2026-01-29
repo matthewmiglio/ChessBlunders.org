@@ -35,7 +35,6 @@ export async function GET(request: NextRequest) {
     const { data: games, error: gamesError } = await query;
 
     if (gamesError) {
-      console.error("[GET /api/games] Games fetch error:", gamesError.message);
       return NextResponse.json({ error: "Failed to fetch games" }, { status: 500 });
     }
 
@@ -50,7 +49,6 @@ export async function GET(request: NextRequest) {
         .in("game_id", gameIds);
 
       if (analysisError) {
-        console.error("[GET /api/games] Analysis fetch error:", analysisError.message);
         // Continue without analysis data rather than failing
       } else if (analysisRecords) {
         analysisMap = Object.fromEntries(analysisRecords.map(a => [a.game_id, a.id]));
@@ -65,7 +63,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ games: gamesWithAnalysis });
   } catch (err) {
-    console.error("[GET /api/games] Unexpected error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -184,7 +181,6 @@ export async function POST(request: NextRequest) {
       maxFreeGames: MAX_FREE_GAMES,
     });
   } catch (error) {
-    console.error("Error importing games:", error);
     return NextResponse.json(
       { error: "Failed to import games" },
       { status: 500 }

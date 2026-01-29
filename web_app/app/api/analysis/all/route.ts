@@ -37,7 +37,6 @@ export async function POST(request: NextRequest) {
     try {
       supabase = await createClient();
     } catch (err) {
-      console.error("[analysis/all] Failed to create Supabase client:", err);
       return NextResponse.json({ error: "Failed to create database client", details: String(err) }, { status: 500 });
     }
 
@@ -45,12 +44,10 @@ export async function POST(request: NextRequest) {
   try {
     const { data, error } = await supabase.auth.getUser();
     if (error) {
-      console.error("[analysis/all] Auth error:", error);
       return NextResponse.json({ error: "Auth error", details: error.message }, { status: 401 });
     }
     user = data.user;
   } catch (err) {
-    console.error("[analysis/all] Exception getting user:", err);
     return NextResponse.json({ error: "Failed to get user", details: String(err) }, { status: 500 });
   }
 
@@ -72,11 +69,9 @@ export async function POST(request: NextRequest) {
 
     // Note: single() returns error when no rows found, which is expected
     if (existingJobError && existingJobError.code !== "PGRST116") {
-      console.error("[analysis/all] Error checking existing job:", existingJobError);
     }
     existingJob = data;
   } catch (err) {
-    console.error("[analysis/all] Exception checking existing job:", err);
     return NextResponse.json({ error: "Failed to check existing jobs", details: String(err) }, { status: 500 });
   }
 
@@ -99,7 +94,6 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id);
 
     if (countError) {
-      console.error("[analysis/all] Error counting analyses:", countError);
       return NextResponse.json({ error: "Failed to check analysis count" }, { status: 500 });
     }
 
@@ -129,7 +123,6 @@ export async function POST(request: NextRequest) {
         .range(offset, offset + PAGE_SIZE - 1);
 
       if (gamesError) {
-        console.error("[analysis/all] Error fetching games:", gamesError);
         return NextResponse.json({ error: gamesError.message }, { status: 500 });
       }
 
@@ -139,7 +132,6 @@ export async function POST(request: NextRequest) {
       offset += PAGE_SIZE;
     }
   } catch (err) {
-    console.error("[analysis/all] Exception fetching games:", err);
     return NextResponse.json({ error: "Failed to fetch games", details: String(err) }, { status: 500 });
   }
 
@@ -156,7 +148,6 @@ export async function POST(request: NextRequest) {
         .range(offset, offset + PAGE_SIZE - 1);
 
       if (analysesError) {
-        console.error("[analysis/all] Error fetching analyses:", analysesError);
         return NextResponse.json({ error: analysesError.message }, { status: 500 });
       }
 
@@ -166,7 +157,6 @@ export async function POST(request: NextRequest) {
       offset += PAGE_SIZE;
     }
   } catch (err) {
-    console.error("[analysis/all] Exception fetching analyses:", err);
     return NextResponse.json({ error: "Failed to fetch analyses", details: String(err) }, { status: 500 });
   }
 
@@ -201,16 +191,13 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (jobError) {
-      console.error("[analysis/all] Error creating job:", jobError);
       return NextResponse.json({ error: "Failed to create analysis job", details: jobError.message }, { status: 500 });
     }
     if (!data) {
-      console.error("[analysis/all] No job data returned");
       return NextResponse.json({ error: "Failed to create analysis job - no data returned" }, { status: 500 });
     }
     job = data;
   } catch (err) {
-    console.error("[analysis/all] Exception creating job:", err);
     return NextResponse.json({ error: "Failed to create analysis job", details: String(err) }, { status: 500 });
   }
 
@@ -245,7 +232,6 @@ export async function POST(request: NextRequest) {
             analyzed++;
           } else {
             failed++;
-            console.error("[analysis/all:bg] Failed to analyze game:", result.reason);
           }
         }
 
@@ -264,7 +250,6 @@ export async function POST(request: NextRequest) {
         .eq("id", job.id);
 
     } catch (error) {
-      console.error("[analysis/all:bg] Background analysis error:", error);
       await bgSupabase
         .from("analysis_jobs")
         .update({
@@ -291,7 +276,6 @@ export async function POST(request: NextRequest) {
   });
 
   } catch (err) {
-    console.error("[analysis/all] UNCAUGHT ERROR:", err);
     return NextResponse.json({
       error: "Unexpected server error",
       details: err instanceof Error ? err.message : String(err),
@@ -340,7 +324,6 @@ async function evaluatePosition(fen: string, depth: number): Promise<EvalResult 
       topMoves,
     };
   } catch (error) {
-    console.error("Lambda evaluation error:", error);
     return null;
   }
 }
@@ -361,7 +344,6 @@ async function analyzeGame(
   try {
     chess.loadPgn(pgn);
   } catch (error) {
-    console.error("Failed to parse PGN:", error);
     return [];
   }
 

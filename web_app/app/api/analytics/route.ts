@@ -42,7 +42,6 @@ export async function POST(request: NextRequest) {
     const { error } = await supabase.from("analytics").insert(insertData);
 
     if (error) {
-      console.error("[Analytics API] Insert error:", error.message);
       return NextResponse.json(
         { error: "Failed to track", details: error.message },
         { status: 500 }
@@ -51,7 +50,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[Analytics API] Error:", error);
     return NextResponse.json(
       { error: "Internal error", details: String(error) },
       { status: 500 }

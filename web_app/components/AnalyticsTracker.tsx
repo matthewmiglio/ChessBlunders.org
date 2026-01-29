@@ -32,7 +32,6 @@ export function AnalyticsTracker() {
   useEffect(() => {
     // Skip if same path (avoid double tracking)
     if (lastPath.current === pathname) {
-      console.log("[Analytics] Skipping duplicate path:", pathname);
       return;
     }
     lastPath.current = pathname;
@@ -47,24 +46,11 @@ export function AnalyticsTracker() {
       sessionId,
     };
 
-    console.log("[Analytics] Tracking page view:", payload);
-
     fetch("/api/analytics", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-    })
-      .then(async (response) => {
-        const data = await response.json();
-        if (response.ok) {
-          console.log("[Analytics] Successfully tracked:", data);
-        } else {
-          console.error("[Analytics] Server returned error:", response.status, data);
-        }
-      })
-      .catch((error) => {
-        console.error("[Analytics] Fetch failed:", error);
-      });
+    }).catch(() => {});
   }, [pathname]);
 
   return null;

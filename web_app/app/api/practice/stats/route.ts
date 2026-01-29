@@ -124,7 +124,6 @@ export async function GET() {
       runStartedAt,
     });
   } catch (error) {
-    console.error("Error fetching practice stats:", error);
     return NextResponse.json(
       { error: "Failed to fetch practice stats" },
       { status: 500 }

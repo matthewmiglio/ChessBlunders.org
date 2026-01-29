@@ -57,7 +57,6 @@ export default function ProgressPage() {
       setStats(data.stats);
       setProgressOverTime(data.progressOverTime || []);
     } catch (err) {
-      console.error("Error fetching stats:", err);
       setError("Failed to load stats");
     } finally {
       setLoading(false);
@@ -74,7 +73,6 @@ export default function ProgressPage() {
         setCurrentRun(data.currentRun || 1);
       }
     } catch (err) {
-      console.error("Error fetching practice runs:", err);
     }
   };
 

@@ -60,7 +60,6 @@ function sanToUci(fen: string, san: string): string | null {
       return move.from + move.to + (move.promotion || "");
     }
   } catch {
-    console.warn("Failed to convert SAN to UCI:", san);
   }
   return null;
 }
@@ -77,7 +76,6 @@ function uciToSan(fen: string, uci: string): string | null {
       return move.san;
     }
   } catch {
-    console.warn("Failed to convert UCI to SAN:", uci);
   }
   return null;
 }
@@ -140,6 +138,7 @@ function PracticeContent() {
   } | null>(null);
   const [puzzlesLoading, setPuzzlesLoading] = useState(false);
   const [expectedMoveUci, setExpectedMoveUci] = useState<string>("");
+  const [blunderMoveUci, setBlunderMoveUci] = useState<string>("");
   const [showHint, setShowHint] = useState(false);
   const [filterCounts, setFilterCounts] = useState<FilterCounts | null>(null);
   const [currentPracticeRun, setCurrentPracticeRun] = useState<number>(1);
@@ -241,11 +240,13 @@ function PracticeContent() {
   }, [user]);
 
 
-  // Convert best_move to UCI when blunder changes
+  // Convert best_move and move_played to UCI when blunder changes
   useEffect(() => {
     if (currentBlunder) {
       const uci = sanToUci(currentBlunder.fen, currentBlunder.best_move);
       setExpectedMoveUci(uci || "");
+      const blunderUci = sanToUci(currentBlunder.fen, currentBlunder.move_played);
+      setBlunderMoveUci(blunderUci || "");
       setShowHint(false);
       // Start timing for this puzzle
       setPuzzleStartTime(Date.now());
@@ -260,7 +261,6 @@ function PracticeContent() {
         setDetailedStats(data);
       }
     } catch (error) {
-      console.error("Error fetching detailed stats:", error);
     }
   };
 
@@ -282,7 +282,6 @@ function PracticeContent() {
         pickRandomPuzzle(data.puzzles);
       }
     } catch (error) {
-      console.error("Error fetching puzzles:", error);
     } finally {
       setPuzzlesLoading(false);
     }
@@ -362,7 +361,6 @@ function PracticeContent() {
       // Refresh detailed stats
       fetchDetailedStats();
     } catch (error) {
-      console.error("Error recording progress:", error);
     }
   };
 
@@ -400,7 +398,6 @@ function PracticeContent() {
         toast.error(data.error || "Failed to start new run");
       }
     } catch (error) {
-      console.error("Error starting new run:", error);
       toast.error("Failed to start new practice run");
     } finally {
       setResetting(false);
@@ -455,6 +452,10 @@ function PracticeContent() {
   const hintArrow = showHint && expectedMoveUci ? {
     from: expectedMoveUci.slice(0, 2),
     to: expectedMoveUci.slice(2, 4)
+  } : null;
+  const blunderArrow = blunderMoveUci ? {
+    from: blunderMoveUci.slice(0, 2),
+    to: blunderMoveUci.slice(2, 4)
   } : null;
 
   const handlePieceClick = () => {
@@ -703,6 +704,7 @@ function PracticeContent() {
               playerSide={playerSide}
               isActive={!feedback || !feedback.correct}
               hintArrow={hintArrow}
+              blunderArrow={blunderArrow}
               onPieceClick={handlePieceClick}
               darkSquareColor={currentTheme.dark}
               lightSquareColor={currentTheme.light}

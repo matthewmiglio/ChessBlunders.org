@@ -32,7 +32,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: session.url });
   } catch (error) {
-    console.error('Update payment error:', error);
     return NextResponse.json({ error: 'Failed to create payment update session' }, { status: 500 });
   }
 }

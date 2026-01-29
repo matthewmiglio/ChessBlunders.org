@@ -43,8 +43,8 @@ export default function SubscriptionManager({
       const data = await res.json();
       setInvoices(data.invoices || []);
       setShowInvoices(true);
-    } catch (error) {
-      console.error('Error fetching invoices:', error);
+    } catch {
+      // silently ignore
     }
   };
 
@@ -59,8 +59,7 @@ export default function SubscriptionManager({
       const { url, error } = await res.json();
       if (error) throw new Error(error);
       window.location.href = url;
-    } catch (error) {
-      console.error('Error:', error);
+    } catch {
       setMessage({ type: 'error', text: 'Failed to start checkout. Please try again.' });
       setLoading(null);
     }
@@ -77,8 +76,7 @@ export default function SubscriptionManager({
       if (error) throw new Error(error);
       setMessage({ type: 'success', text: 'Subscription canceled. You will keep access until the end of your billing period.' });
       window.location.reload();
-    } catch (error) {
-      console.error('Error:', error);
+    } catch {
       setMessage({ type: 'error', text: 'Failed to cancel subscription. Please try again.' });
       setLoading(null);
     }
@@ -92,8 +90,7 @@ export default function SubscriptionManager({
       if (error) throw new Error(error);
       setMessage({ type: 'success', text: 'Subscription reactivated!' });
       window.location.reload();
-    } catch (error) {
-      console.error('Error:', error);
+    } catch {
       setMessage({ type: 'error', text: 'Failed to reactivate subscription. Please try again.' });
       setLoading(null);
     }
@@ -106,8 +103,7 @@ export default function SubscriptionManager({
       const { url, error } = await res.json();
       if (error) throw new Error(error);
       window.location.href = url;
-    } catch (error) {
-      console.error('Error:', error);
+    } catch {
       setMessage({ type: 'error', text: 'Failed to start payment update. Please try again.' });
       setLoading(null);
     }

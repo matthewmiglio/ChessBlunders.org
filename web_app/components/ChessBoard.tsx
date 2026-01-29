@@ -31,6 +31,7 @@ interface ChessBoardProps {
   playerSide: "w" | "b";
   isActive: boolean;
   hintArrow?: { from: string; to: string } | null;
+  blunderArrow?: { from: string; to: string } | null; // Arrow showing the blunder move with X
   onPieceClick?: () => void;
   darkSquareColor?: string;
   lightSquareColor?: string;
@@ -44,6 +45,7 @@ export default function ChessBoard({
   playerSide,
   isActive,
   hintArrow,
+  blunderArrow,
   onPieceClick,
   darkSquareColor = "#5994EF",
   lightSquareColor = "#F2F6FA",
@@ -98,7 +100,7 @@ export default function ChessBoard({
       newGame.load(fen);
       setGame(newGame);
     } catch {
-      console.warn("Invalid FEN:", fen);
+      // Invalid FEN - ignore
     }
     // Reset selection when FEN changes
     setSelectedSquare(null);
@@ -229,17 +231,49 @@ export default function ChessBoard({
     return styles;
   }, [selectedSquare, validMoves]);
 
-  // Arrow for hint
+  // Arrows for hint only (blunder uses custom line)
   const arrows = useMemo(() => {
+    const result = [];
     if (hintArrow) {
-      return [{
+      result.push({
         startSquare: hintArrow.from,
         endSquare: hintArrow.to,
-        color: "rgba(255, 111, 0, 0.8)"
-      }];
+        color: "rgba(255, 111, 0, 0.8)" // Orange for hint
+      });
     }
-    return [];
+    return result;
   }, [hintArrow]);
+
+  // Calculate line coordinates for blunder (line with X at end)
+  const blunderLineCoords = useMemo(() => {
+    if (!blunderArrow) return null;
+
+    // Convert square notation to coordinates (0-7)
+    const fileToNum = (file: string) => file.charCodeAt(0) - 'a'.charCodeAt(0);
+    const rankToNum = (rank: string) => parseInt(rank) - 1;
+
+    const fromFile = fileToNum(blunderArrow.from[0]);
+    const fromRank = rankToNum(blunderArrow.from[1]);
+    const toFile = fileToNum(blunderArrow.to[0]);
+    const toRank = rankToNum(blunderArrow.to[1]);
+
+    // Convert to percentage based on board orientation
+    const squareSize = 100 / 8;
+    let x1, y1, x2, y2;
+    if (playerSide === "w") {
+      x1 = (fromFile + 0.5) * squareSize;
+      y1 = (7 - fromRank + 0.5) * squareSize;
+      x2 = (toFile + 0.5) * squareSize;
+      y2 = (7 - toRank + 0.5) * squareSize;
+    } else {
+      x1 = (7 - fromFile + 0.5) * squareSize;
+      y1 = (fromRank + 0.5) * squareSize;
+      x2 = (7 - toFile + 0.5) * squareSize;
+      y2 = (toRank + 0.5) * squareSize;
+    }
+
+    return { x1, y1, x2, y2 };
+  }, [blunderArrow, playerSide]);
 
   return (
     <div
@@ -265,6 +299,69 @@ export default function ChessBoard({
             arrows: arrows,
           }}
         />
+        {/* Line with X at end for blunder */}
+        {blunderLineCoords && (
+          <svg
+            className="absolute inset-0 pointer-events-none"
+            width={boardWidth}
+            height={boardWidth}
+            viewBox="0 0 100 100"
+          >
+            {/* Line from source to destination */}
+            <line
+              x1={blunderLineCoords.x1}
+              y1={blunderLineCoords.y1}
+              x2={blunderLineCoords.x2}
+              y2={blunderLineCoords.y2}
+              stroke="rgba(220, 38, 38, 0.8)"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+            {/* Small X at destination */}
+            <g
+              transform={`translate(${blunderLineCoords.x2}, ${blunderLineCoords.y2})`}
+            >
+              {/* White outline for visibility */}
+              <line
+                x1="-1.25"
+                y1="-1.25"
+                x2="1.25"
+                y2="1.25"
+                stroke="white"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+              <line
+                x1="1.25"
+                y1="-1.25"
+                x2="-1.25"
+                y2="1.25"
+                stroke="white"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+              {/* Red X */}
+              <line
+                x1="-1.25"
+                y1="-1.25"
+                x2="1.25"
+                y2="1.25"
+                stroke="rgba(220, 38, 38, 0.8)"
+                strokeWidth="1"
+                strokeLinecap="round"
+              />
+              <line
+                x1="1.25"
+                y1="-1.25"
+                x2="-1.25"
+                y2="1.25"
+                stroke="rgba(220, 38, 38, 0.8)"
+                strokeWidth="1"
+                strokeLinecap="round"
+              />
+            </g>
+          </svg>
+        )}
       </div>
     </div>
   );

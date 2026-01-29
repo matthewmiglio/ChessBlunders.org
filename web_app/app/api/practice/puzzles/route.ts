@@ -198,7 +198,6 @@ export async function GET(request: NextRequest) {
       currentPracticeRun: currentRun,
     });
   } catch (error) {
-    console.error("Error fetching puzzles:", error);
     return NextResponse.json(
       { error: "Failed to fetch puzzles" },
       { status: 500 }

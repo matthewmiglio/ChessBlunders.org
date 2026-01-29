@@ -13,7 +13,6 @@ export async function GET() {
       );
 
     if (profilesError) {
-      console.error("Supabase error:", profilesError);
       return NextResponse.json(
         { error: profilesError.message },
         { status: 500 }
@@ -104,8 +103,7 @@ export async function GET() {
         arpu: totalUsers > 0 ? (totalRevenue / totalUsers).toFixed(2) : "0",
       },
     });
-  } catch (error) {
-    console.error("Stats API error:", error);
+  } catch {
     return NextResponse.json(
       { error: "Failed to fetch stats" },
       { status: 500 }

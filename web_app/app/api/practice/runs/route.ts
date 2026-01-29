@@ -122,7 +122,6 @@ export async function GET() {
       runs,
     });
   } catch (error) {
-    console.error("Error fetching practice runs:", error);
     return NextResponse.json(
       { error: "Failed to fetch practice runs" },
       { status: 500 }

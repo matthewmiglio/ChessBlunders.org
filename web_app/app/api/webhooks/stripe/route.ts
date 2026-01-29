@@ -68,7 +68,6 @@ export async function POST(req: NextRequest) {
       process.env.STRIPE_WEBHOOK_SECRET!
     );
   } catch (err) {
-    console.error('[stripe-webhook] Signature verification failed:', err);
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
@@ -107,7 +106,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error('Webhook handler error:', error);
     return NextResponse.json(
       { error: 'Webhook handler failed' },
       { status: 500 }
@@ -120,7 +118,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const customerId = session.customer as string;
 
   if (!subscriptionId) {
-    console.error('[stripe-webhook] No subscription ID in session');
     return;
   }
 
@@ -129,7 +126,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const userId = subscription.metadata.supabase_user_id;
 
   if (!userId) {
-    console.error('[stripe-webhook] No supabase_user_id in subscription metadata');
     return;
   }
 
@@ -151,7 +147,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     .eq('id', userId);
 
   if (error) {
-    console.error('[stripe-webhook] Failed to update profile:', error);
     throw error;
   }
 }
@@ -166,7 +161,6 @@ async function handleInvoicePaid(invoice: InvoiceWithSubscription) {
   const userId = subscription.metadata.supabase_user_id;
 
   if (!userId) {
-    console.error('[stripe-webhook] No supabase_user_id in subscription metadata for invoice.paid');
     return;
   }
 
@@ -183,7 +177,6 @@ async function handleInvoicePaid(invoice: InvoiceWithSubscription) {
     .eq('id', userId);
 
   if (error) {
-    console.error('[stripe-webhook] Failed to update profile for invoice.paid:', error);
     throw error;
   }
 }
@@ -198,7 +191,6 @@ async function handlePaymentFailed(invoice: InvoiceWithSubscription) {
   const userId = subscription.metadata.supabase_user_id;
 
   if (!userId) {
-    console.error('[stripe-webhook] No supabase_user_id in subscription metadata for payment.failed');
     return;
   }
 
@@ -211,7 +203,6 @@ async function handlePaymentFailed(invoice: InvoiceWithSubscription) {
     .eq('id', userId);
 
   if (error) {
-    console.error('[stripe-webhook] Failed to update profile for payment.failed:', error);
     throw error;
   }
 }
@@ -221,7 +212,6 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const period = getSubscriptionPeriod(subscription);
 
   if (!userId) {
-    console.error('[stripe-webhook] No supabase_user_id in subscription metadata for subscription.updated');
     return;
   }
 
@@ -238,7 +228,6 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     .eq('id', userId);
 
   if (error) {
-    console.error('[stripe-webhook] Failed to update subscription:', error);
     throw error;
   }
 }
@@ -247,7 +236,6 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const userId = subscription.metadata.supabase_user_id;
 
   if (!userId) {
-    console.error('[stripe-webhook] No supabase_user_id in subscription metadata for subscription.deleted');
     return;
   }
 
@@ -261,7 +249,6 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     .eq('id', userId);
 
   if (error) {
-    console.error('[stripe-webhook] Failed to update profile for subscription.deleted:', error);
     throw error;
   }
 }

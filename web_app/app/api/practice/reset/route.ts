@@ -55,7 +55,6 @@ export async function POST() {
     const { data: result, error } = await supabase.rpc("start_new_practice_run");
 
     if (error) {
-      console.error("Error starting new practice run:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
@@ -65,7 +64,6 @@ export async function POST() {
       message: "Started new practice run",
     });
   } catch (error) {
-    console.error("Error resetting practice:", error);
     return NextResponse.json(
       { error: "Failed to reset practice" },
       { status: 500 }

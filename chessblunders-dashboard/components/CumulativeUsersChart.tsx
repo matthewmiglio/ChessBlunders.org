@@ -28,7 +28,6 @@ export function CumulativeUsersChart() {
       try {
         const res = await fetch("/api/usage/cumulative-users");
         const json = await res.json();
-        console.log("[CumulativeUsersChart] Response:", json);
         if (json.error) {
           setError(json.error);
           setData([]);
@@ -36,7 +35,6 @@ export function CumulativeUsersChart() {
           setData(Array.isArray(json) ? json : []);
         }
       } catch (e) {
-        console.error("[CumulativeUsersChart] Fetch error:", e);
         setError(String(e));
       }
       setLoading(false);
