@@ -2,6 +2,12 @@
 
 A chess training tool that analyzes your Chess.com games to find blunders and turn them into personalized training puzzles.
 
+<img width="1893" height="897" alt="image" src="https://github.com/user-attachments/assets/4c70084b-c1e2-4ed4-8f20-086353bf18b7" />
+<img width="1906" height="899" alt="image" src="https://github.com/user-attachments/assets/3da96d84-b4bd-4108-ab33-afff0dd75f41" />
+<img width="1905" height="896" alt="image" src="https://github.com/user-attachments/assets/ef51d189-0002-4965-95da-123d882e87b5" />
+
+
+
 ## How It Works
 
 1. Fetches all your games from Chess.com
