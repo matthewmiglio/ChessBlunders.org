@@ -53,3 +53,6 @@ web_app/*.tsbuildinfo
 web_app/coverage/
 web_app/docs/
 web_app/sql/
+
+# dashboard development
+chessblunders-dashboard/sql/
