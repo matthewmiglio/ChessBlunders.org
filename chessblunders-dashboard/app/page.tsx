@@ -12,6 +12,12 @@ import { UsageStatsCards } from "@/components/UsageStatsCards";
 import { GamesOverTimeChart } from "@/components/GamesOverTimeChart";
 import { AnalysesOverTimeChart } from "@/components/AnalysesOverTimeChart";
 import { PracticeOverTimeChart } from "@/components/PracticeOverTimeChart";
+import { GameResultsPieChart } from "@/components/GameResultsPieChart";
+import { BlunderCountDistribution } from "@/components/BlunderCountDistribution";
+import { SolveAttemptsDistribution } from "@/components/SolveAttemptsDistribution";
+import { EngineUsageOverTime } from "@/components/EngineUsageOverTime";
+import { UserActivityPieChart } from "@/components/UserActivityPieChart";
+import { CumulativeUsersChart } from "@/components/CumulativeUsersChart";
 
 interface Summary {
   total_views: number;
@@ -125,7 +131,27 @@ export default function Dashboard() {
             <GamesOverTimeChart />
             <AnalysesOverTimeChart />
             <PracticeOverTimeChart />
+            <EngineUsageOverTime />
           </div>
+        </section>
+
+        {/* Game & Practice Analytics */}
+        <section className="mb-8">
+          <h2 className="text-lg font-semibold text-gray-100 mb-4">Game & Practice Analytics</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <GameResultsPieChart />
+            <UserActivityPieChart />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <BlunderCountDistribution />
+            <SolveAttemptsDistribution />
+          </div>
+        </section>
+
+        {/* User Growth */}
+        <section className="mb-8">
+          <h2 className="text-lg font-semibold text-gray-100 mb-4">User Growth</h2>
+          <CumulativeUsersChart />
         </section>
 
         {/* Subscription & Revenue Stats */}
