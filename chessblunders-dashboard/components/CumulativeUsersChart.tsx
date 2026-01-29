@@ -19,13 +19,26 @@ function formatDateEST(dateStr: string): string {
 export function CumulativeUsersChart() {
   const [data, setData] = useState<DailyData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      const res = await fetch("/api/usage/cumulative-users");
-      const json = await res.json();
-      setData(Array.isArray(json) ? json : []);
+      setError(null);
+      try {
+        const res = await fetch("/api/usage/cumulative-users");
+        const json = await res.json();
+        console.log("[CumulativeUsersChart] Response:", json);
+        if (json.error) {
+          setError(json.error);
+          setData([]);
+        } else {
+          setData(Array.isArray(json) ? json : []);
+        }
+      } catch (e) {
+        console.error("[CumulativeUsersChart] Fetch error:", e);
+        setError(String(e));
+      }
       setLoading(false);
     }
     fetchData();
@@ -36,6 +49,15 @@ export function CumulativeUsersChart() {
       <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 animate-pulse">
         <div className="h-4 bg-gray-700 rounded w-1/3 mb-4"></div>
         <div className="h-48 bg-gray-800 rounded"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
+        <h3 className="text-sm font-bold text-gray-100 mb-4">Cumulative Users Over Time</h3>
+        <p className="text-red-400 text-sm">Error: {error}</p>
       </div>
     );
   }
