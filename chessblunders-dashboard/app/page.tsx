@@ -8,6 +8,10 @@ import { TopCountriesChart } from "@/components/TopCountriesChart";
 import { SubscriptionStats } from "@/components/SubscriptionStats";
 import { FeedbackList } from "@/components/FeedbackList";
 import { PeriodComparison } from "@/components/PeriodComparison";
+import { UsageStatsCards } from "@/components/UsageStatsCards";
+import { GamesOverTimeChart } from "@/components/GamesOverTimeChart";
+import { AnalysesOverTimeChart } from "@/components/AnalysesOverTimeChart";
+import { PracticeOverTimeChart } from "@/components/PracticeOverTimeChart";
 
 interface Summary {
   total_views: number;
@@ -103,6 +107,24 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <TopPagesChart />
             <TopCountriesChart />
+          </div>
+        </section>
+
+        {/* Usage Statistics */}
+        <section className="mb-8">
+          <h2 className="text-lg font-semibold text-gray-100 mb-4">
+            Usage Statistics
+          </h2>
+          <UsageStatsCards />
+        </section>
+
+        {/* Usage Over Time Charts */}
+        <section className="mb-8">
+          <h2 className="text-lg font-semibold text-gray-100 mb-4">Usage Over Time</h2>
+          <div className="space-y-6">
+            <GamesOverTimeChart />
+            <AnalysesOverTimeChart />
+            <PracticeOverTimeChart />
           </div>
         </section>
 
