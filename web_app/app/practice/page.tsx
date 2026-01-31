@@ -83,8 +83,13 @@ function uciToSan(fen: string, uci: string): string | null {
 // Type for move rank (1 = best, 2 = second best, 3 = third best, null = not in top 3)
 type MoveRank = 1 | 2 | 3 | null;
 
-// Check user's move against top 3 moves
-function checkMoveRank(userMoveUci: string, blunder: Blunder): MoveRank {
+// Check user's move against the FILTERED top moves (not all top moves)
+// This ensures moves that are filtered out due to eval gaps don't count as correct
+function checkMoveRank(
+  userMoveUci: string,
+  blunder: Blunder,
+  filteredMoves: { move: string; score: number }[] | null
+): MoveRank {
   // Handle old blunders without top_moves
   if (!blunder.top_moves || blunder.top_moves.length === 0) {
     // Convert best_move from SAN to UCI for comparison
@@ -92,9 +97,12 @@ function checkMoveRank(userMoveUci: string, blunder: Blunder): MoveRank {
     return userMoveUci === bestMoveUci ? 1 : null;
   }
 
-  // Check against all top moves
-  for (let i = 0; i < blunder.top_moves.length; i++) {
-    if (userMoveUci === blunder.top_moves[i].move) {
+  // If no filtered moves provided, fall back to checking all top moves
+  const movesToCheck = filteredMoves || blunder.top_moves;
+
+  // Check against filtered moves only
+  for (let i = 0; i < movesToCheck.length; i++) {
+    if (userMoveUci === movesToCheck[i].move) {
       return (i + 1) as MoveRank;
     }
   }
@@ -119,6 +127,48 @@ function getMoveRankFeedback(rank: MoveRank): { message: string; isCorrect: bool
 function getPlayerSide(fen: string): "w" | "b" {
   const parts = fen.split(" ");
   return parts[1] === "b" ? "b" : "w";
+}
+
+// Filter top moves to show based on evaluation gaps
+// Only show moves that are reasonably close in quality to better moves
+function filterTopMovesToShow(topMoves: { move: string; score: number }[]): { move: string; score: number }[] {
+  if (!topMoves || topMoves.length === 0) return [];
+  if (topMoves.length === 1) return topMoves;
+
+  const result: { move: string; score: number }[] = [topMoves[0]]; // Always show #1
+  const dominated = 101; // 1.01 in centipawns - significant gap threshold
+
+  // Check if we should show move #2
+  if (topMoves.length >= 2) {
+    const move1 = topMoves[0];
+    const move2 = topMoves[1];
+
+    const move1Winning = move1.score > 0;
+    const move2Losing = move2.score < 0;
+    const hugeGap = move1.score >= move2.score + dominated;
+
+    // Don't show #2 if: #1 is winning but #2 is losing, OR #1 dominates by 1.01+
+    if (!(move1Winning && move2Losing) && !hugeGap) {
+      result.push(move2);
+    }
+  }
+
+  // Check if we should show move #3 (only if we're showing #2)
+  if (topMoves.length >= 3 && result.length >= 2) {
+    const move2 = topMoves[1];
+    const move3 = topMoves[2];
+
+    const move2Winning = move2.score > 0;
+    const move3Losing = move3.score < 0;
+    const hugeGap = move2.score >= move3.score + dominated;
+
+    // Don't show #3 if: #2 is winning but #3 is losing, OR #2 dominates #3 by 1.01+
+    if (!(move2Winning && move3Losing) && !hugeGap) {
+      result.push(move3);
+    }
+  }
+
+  return result;
 }
 
 function PracticeContent() {
@@ -307,8 +357,14 @@ function PracticeContent() {
   const handleMoveResult = async (_correct: boolean, userMoveUci: string) => {
     if (!currentBlunder || !currentAnalysisId) return;
 
-    // Check move against top 3 moves
-    const rank = checkMoveRank(userMoveUci, currentBlunder);
+    // Filter top moves based on eval gaps (same logic used for display)
+    // Moves filtered out here won't count as correct
+    const acceptableMoves = currentBlunder.top_moves && currentBlunder.top_moves.length > 0
+      ? filterTopMovesToShow(currentBlunder.top_moves.slice(0, 3))
+      : null;
+
+    // Check move against filtered top moves only
+    const rank = checkMoveRank(userMoveUci, currentBlunder, acceptableMoves);
     const { message, isCorrect } = getMoveRankFeedback(rank);
 
     if (isCorrect) {
@@ -457,6 +513,21 @@ function PracticeContent() {
     from: blunderMoveUci.slice(0, 2),
     to: blunderMoveUci.slice(2, 4)
   } : null;
+
+  // Filter top moves based on evaluation gaps (don't show much worse alternatives)
+  // Used for both arrows and text display
+  const filteredTopMoves = (feedback?.correct && currentBlunder?.top_moves && currentBlunder.top_moves.length > 0)
+    ? filterTopMovesToShow(currentBlunder.top_moves.slice(0, 3))
+    : null;
+
+  // Top move arrows - only show when puzzle is solved correctly
+  const topMoveArrows = filteredTopMoves
+    ? filteredTopMoves.map((m, idx) => ({
+        from: m.move.slice(0, 2),
+        to: m.move.slice(2, 4),
+        rank: (idx + 1) as 1 | 2 | 3
+      }))
+    : null;
 
   const handlePieceClick = () => {
     // Hide hint arrow when user clicks a piece
@@ -705,6 +776,7 @@ function PracticeContent() {
               isActive={!feedback || !feedback.correct}
               hintArrow={hintArrow}
               blunderArrow={blunderArrow}
+              topMoveArrows={topMoveArrows}
               onPieceClick={handlePieceClick}
               darkSquareColor={currentTheme.dark}
               lightSquareColor={currentTheme.light}
@@ -818,9 +890,9 @@ function PracticeContent() {
                   >
                     Top Moves
                   </h3>
-                  {currentBlunder?.top_moves && currentBlunder.top_moves.length > 0 ? (
+                  {filteredTopMoves && filteredTopMoves.length > 0 ? (
                     <div>
-                      {currentBlunder.top_moves.map((m, i) => (
+                      {filteredTopMoves.map((m, i) => (
                         <div
                           key={i}
                           className="flex justify-between items-center border-b border-white/5 last:border-0"

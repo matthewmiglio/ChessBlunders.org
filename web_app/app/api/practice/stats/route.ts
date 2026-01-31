@@ -18,14 +18,27 @@ export async function GET() {
       .eq("id", user.id)
       .single();
 
-    const currentRun = profile?.current_practice_run || 1;
+    const profileRun = profile?.current_practice_run || 1;
 
-    // Get all progress records for current run
-    const { data: progressRecords } = await supabase
+    // Get all progress records for user (we'll filter by run after checking what exists)
+    const { data: allProgressRecords } = await supabase
       .from("user_progress")
-      .select("analysis_id, blunder_index, solved, attempts, solved_at, created_at")
-      .eq("user_id", user.id)
-      .eq("practice_run", currentRun);
+      .select("analysis_id, blunder_index, solved, attempts, solved_at, created_at, practice_run")
+      .eq("user_id", user.id);
+
+    // Find the actual run that has data - use profile run if it has data, otherwise find the max run with data
+    const runsWithData = new Set((allProgressRecords || []).map(r => r.practice_run).filter(r => r != null));
+    let currentRun = profileRun;
+
+    // If the profile's run has no data, use the highest run that does have data
+    if (!runsWithData.has(profileRun) && runsWithData.size > 0) {
+      currentRun = Math.max(...Array.from(runsWithData));
+    }
+
+    // Filter to current run (or NULL for legacy)
+    const progressRecords = (allProgressRecords || []).filter(
+      r => r.practice_run === currentRun || r.practice_run == null
+    );
 
     // Get total blunders count from analysis
     const { data: analyses } = await supabase

@@ -98,14 +98,27 @@ export async function GET(request: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    const currentRun = profileData?.current_practice_run || 1;
+    const profileRun = profileData?.current_practice_run || 1;
 
-    // Fetch user progress for current practice run only
-    const { data: progressData, error: progressError } = await supabase
+    // Fetch ALL user progress records (we'll filter by run after checking what exists)
+    const { data: allProgressData, error: progressError } = await supabase
       .from("user_progress")
       .select("analysis_id, blunder_index, solved, attempts, practice_run")
-      .eq("user_id", user.id)
-      .eq("practice_run", currentRun);
+      .eq("user_id", user.id);
+
+    // Find the actual run that has data - use profile run if it has data, otherwise find the max run with data
+    const runsWithData = new Set((allProgressData || []).map(r => r.practice_run).filter(r => r != null));
+    let currentRun = profileRun;
+
+    // If the profile's run has no data, use the highest run that does have data
+    if (!runsWithData.has(profileRun) && runsWithData.size > 0) {
+      currentRun = Math.max(...Array.from(runsWithData));
+    }
+
+    // Filter to current run (or NULL for legacy)
+    const progressData = (allProgressData || []).filter(
+      (r: ProgressRecord) => r.practice_run === currentRun || r.practice_run == null
+    );
 
     if (progressError) {
       return NextResponse.json({ error: progressError.message }, { status: 500 });
