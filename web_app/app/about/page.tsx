@@ -143,15 +143,14 @@ export default function AboutPage() {
         {/* Philosophy Section */}
         <section className="space-y-8">
           <div className="grid md:grid-cols-2 gap-8 items-center">
-            <div className="relative h-[300px] sm:h-[400px] rounded-xl overflow-hidden order-2 md:order-1">
+            <div className="relative h-[300px] sm:h-[400px] overflow-hidden order-2 md:order-1 flex items-center justify-center">
               <Image
-                src="/high-res/photo-1580541832626-2a7131ee809f.avif"
-                alt="Chess pieces in strategic position illustrating pattern recognition and game analysis"
-                fill
-                sizes="(max-width: 768px) 100vw, 50vw"
-                className="object-cover"
+                src="/hero.png"
+                alt="Chess position showing a blunder with question marks, illustrating learning from mistakes"
+                width={400}
+                height={400}
+                className="object-contain max-h-full"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#141414]/60 via-transparent to-transparent" />
             </div>
 
             <div className="space-y-6 order-1 md:order-2">
