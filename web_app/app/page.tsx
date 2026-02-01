@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
 
 export default function Home() {
@@ -110,9 +111,11 @@ export default function Home() {
                     { opponent: "SvidlerPro", result: "Won", blunders: 0, avatar: "/profile_icons/igorpic.webp" },
                   ].map((game, i) => (
                     <div key={i} className="flex items-center gap-3 p-3 bg-[#3c3c3c]/50 rounded-lg border border-white/5">
-                      <img
+                      <Image
                         src={game.avatar}
                         alt={game.opponent}
+                        width={32}
+                        height={32}
                         className="w-8 h-8 rounded-md object-cover border border-white/10"
                       />
                       <div className="flex-1">
@@ -142,9 +145,11 @@ export default function Home() {
                     <span className="px-2 py-0.5 rounded-md bg-[#f44336]/20 text-[#f44336] text-xs font-medium">-3.2</span>
                   </div>
                   {/* Chess board image */}
-                  <img
+                  <Image
                     src="/hero.png"
-                    alt="Chess position"
+                    alt="Chess position showing a blunder analysis"
+                    width={400}
+                    height={400}
                     className="w-full rounded-md border border-white/10 mb-4"
                   />
                   <div className="space-y-2">

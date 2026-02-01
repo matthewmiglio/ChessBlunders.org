@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import type { Metadata } from "next";
 import { AboutCTA } from "@/components/AboutCTA";
 
@@ -138,6 +139,14 @@ export default function AboutPage() {
               </div>
             ))}
           </div>
+          <div className="text-center pt-4">
+            <Link
+              href="/auth/signin"
+              className="inline-flex items-center justify-center rounded-md bg-[#f44336] px-6 py-3 text-sm font-medium text-white shadow-sm hover:bg-[#f44336]/90 transition-all"
+            >
+              Get Started Free
+            </Link>
+          </div>
         </section>
 
         {/* Philosophy Section */}
@@ -149,6 +158,7 @@ export default function AboutPage() {
                 alt="Chess position showing a blunder with question marks, illustrating learning from mistakes"
                 width={400}
                 height={400}
+                sizes="(max-width: 768px) 100vw, 400px"
                 className="object-contain max-h-full"
               />
             </div>

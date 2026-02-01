@@ -38,16 +38,43 @@ export const metadata: Metadata = {
     siteName: "ChessBlunders.org",
     type: "website",
     locale: "en_US",
+    images: [
+      {
+        url: "/hero.png",
+        width: 800,
+        height: 800,
+        alt: "ChessBlunders - Chess blunder analysis",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "ChessBlunders.org - Learn From Your Chess Mistakes",
     description:
       "Analyze your chess games with Stockfish 16 to find blunders, then practice them as puzzles.",
+    images: ["/hero.png"],
   },
   robots: {
     index: true,
     follow: true,
+  },
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "ChessBlunders.org",
+  url: "https://chessblunders.org",
+  description:
+    "Analyze your chess games with Stockfish 16 to find blunders, then practice them as puzzles.",
+  publisher: {
+    "@type": "Organization",
+    name: "ChessBlunders.org",
+    url: "https://chessblunders.org",
+    logo: {
+      "@type": "ImageObject",
+      url: "https://chessblunders.org/logos/chessblundericon.png",
+    },
   },
 };
 
@@ -58,6 +85,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} antialiased bg-[#141414] text-[#f5f5f5] min-h-screen`}
       >

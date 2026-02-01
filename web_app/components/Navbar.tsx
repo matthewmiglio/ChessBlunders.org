@@ -27,7 +27,7 @@ export function Navbar() {
         {/* Logo */}
         <div className="p-5 border-b border-white/10">
           <Link href="/" className="flex items-center gap-3 group">
-            <Image src="/logos/chessblundericon.png" alt="ChessBlunders" width={34} height={34} className="rounded" />
+            <Image src="/logos/chessblundericon.png" alt="ChessBlunders" width={34} height={34} sizes="34px" className="rounded" />
             <span className="font-[family-name:var(--font-cinzel)] text-2xl font-semibold text-[#f5f5f5] group-hover:text-[#f44336] transition-colors">
               Chess<span className="text-[#f44336]">Blunders</span>
             </span>
@@ -104,6 +104,7 @@ export function Navbar() {
                 alt="ChessBlunders"
                 width={32}
                 height={32}
+                sizes="32px"
                 className="rounded"
               />
               <span className="hidden sm:inline">Chess<span className="text-[#f44336]">Blunders</span>.org</span>

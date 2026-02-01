@@ -5,7 +5,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: ["/", "/auth/signin"],
+        allow: ["/", "/auth/signin", "/feedback"],
         disallow: [
           "/api/",
           "/auth/callback",
@@ -14,7 +14,6 @@ export default function robots(): MetadataRoute.Robots {
           "/practice",
           "/progress",
           "/account",
-          "/feedback",
         ],
       },
     ],
