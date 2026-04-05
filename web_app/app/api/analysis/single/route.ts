@@ -129,6 +129,12 @@ async function analyzeGame(
 }
 
 export async function POST(request: NextRequest) {
+  // Temporarily disabled to stop AWS Lambda charges
+  return NextResponse.json(
+    { error: "Analysis is temporarily unavailable", disabled: true },
+    { status: 503 }
+  );
+
   try {
     const body = await request.json();
     const { gameId, depth: requestedDepth } = body;
@@ -149,7 +155,7 @@ export async function POST(request: NextRequest) {
       .from("analysis")
       .select("id")
       .eq("game_id", gameId)
-      .eq("user_id", user.id)
+      .eq("user_id", user!.id)
       .single();
 
     if (existingAnalysis) {
@@ -170,7 +176,7 @@ export async function POST(request: NextRequest) {
       const { count } = await supabase
         .from("analysis")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id);
+        .eq("user_id", user!.id);
 
       if ((count || 0) >= MAX_FREE_ANALYSES) {
         return NextResponse.json({
@@ -185,7 +191,7 @@ export async function POST(request: NextRequest) {
       .from("games")
       .select("id, pgn, user_color")
       .eq("id", gameId)
-      .eq("user_id", user.id)
+      .eq("user_id", user!.id)
       .single();
 
     if (gameError || !game) {
@@ -194,18 +200,18 @@ export async function POST(request: NextRequest) {
 
     // Analyze the game
     const blunders = await analyzeGame(
-      game.pgn,
-      game.user_color,
+      game!.pgn,
+      game!.user_color,
       100, // threshold
       supabase,
-      user.id,
+      user!.id,
       analysisDepth
     );
 
     // Save analysis
     const { error: insertError } = await supabase.from("analysis").insert({
-      game_id: game.id,
-      user_id: user.id,
+      game_id: game!.id,
+      user_id: user!.id,
       blunders: blunders,
       threshold_cp: 100,
     });
@@ -223,7 +229,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return NextResponse.json({
       error: "Analysis failed",
-      details: error instanceof Error ? error.message : String(error)
+      details: error instanceof Error ? (error as Error).message : String(error)
     }, { status: 500 });
   }
 }

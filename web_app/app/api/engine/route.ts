@@ -9,6 +9,12 @@ const MAX_PREMIUM_DEPTH = 25;
 
 // POST /api/engine - Analyze a position with Stockfish
 export async function POST(request: NextRequest) {
+  // Temporarily disabled to stop AWS Lambda charges
+  return NextResponse.json(
+    { error: "Analysis is temporarily unavailable", disabled: true },
+    { status: 503 }
+  );
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 

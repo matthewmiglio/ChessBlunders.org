@@ -16,6 +16,12 @@ const CONCURRENCY_LIMIT = 20;
 const MAX_FREE_ANALYSES = 100; // Total analyses a free user can retain
 
 export async function POST(request: NextRequest) {
+  // Temporarily disabled to stop AWS Lambda charges
+  return NextResponse.json(
+    { error: "Analysis is temporarily unavailable", disabled: true },
+    { status: 503 }
+  );
+
   try {
     // Parse optional depth from request body
     let requestedDepth = DEFAULT_ANALYSIS_DEPTH;
@@ -152,7 +158,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (!analyses || analyses.length === 0) break;
-      allAnalyzedIds.push(...analyses.map((a) => a.game_id));
+      allAnalyzedIds.push(...analyses.map((a: { game_id: string }) => a.game_id));
       if (analyses.length < PAGE_SIZE) break;
       offset += PAGE_SIZE;
     }
@@ -275,11 +281,12 @@ export async function POST(request: NextRequest) {
     } : null,
   });
 
-  } catch (err) {
+  } catch (err: unknown) {
+    const e = err as Error;
     return NextResponse.json({
       error: "Unexpected server error",
-      details: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : undefined
+      details: err instanceof Error ? e.message : String(err),
+      stack: err instanceof Error ? e.stack : undefined
     }, { status: 500 });
   }
 }
