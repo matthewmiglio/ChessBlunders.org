@@ -33,26 +33,23 @@ local_python/data/
 local_python/poetry.lock
 local_python/config.json
 
-# Stripe CLI config (contains API keys)
-stripe/config.json
-
-# Vercel CLI config (contains API keys)
-vercel/config.json
+# Vercel CLI helper (local-only, contains API keys)
+vercel/
 
 # Supabase CLI config (contains API keys)
 supabase/config.json
 
-# web_app (Next.js)
-web_app/node_modules/
-web_app/.next/
-web_app/out/
-web_app/build/
-web_app/.vercel
-web_app/.env*
-web_app/*.tsbuildinfo
-web_app/coverage/
-web_app/docs/
-web_app/sql/
+# website (Next.js)
+website/node_modules/
+website/.next/
+website/out/
+website/build/
+website/.vercel
+website/.env*
+website/*.tsbuildinfo
+website/coverage/
+website/docs/
+website/sql/
 
 # dashboard development
-chessblunders-dashboard/sql/
+dashboard/sql/

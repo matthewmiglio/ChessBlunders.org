@@ -9,9 +9,9 @@ const MAX_FREE_ANALYSES = 100;
 const MAX_BLUNDERS_PER_GAME = 200;
 const THRESHOLD_CP = 100;
 
-// Analysis now runs in the user's browser (lib/analysis/analyzeGameClient.ts);
-// this route only persists the computed blunders, mirroring the checks the old
-// Lambda-backed /api/analysis/single route performed before its insert.
+// Analysis runs in the user's browser (lib/analysis/analyzeGameClient.ts);
+// this route only persists the computed blunders, with the same ownership,
+// dedupe, and free-tier checks the retired server-side analysis performed.
 
 function isValidBlunder(b: unknown): b is Blunder {
   if (typeof b !== "object" || b === null) return false;

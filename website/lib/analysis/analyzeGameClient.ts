@@ -2,10 +2,10 @@ import { Chess } from "chess.js";
 import type { Engine } from "@/lib/engines/types";
 import type { Blunder, TopMove } from "@/lib/supabase";
 
-// Client-side port of the old Lambda-backed analyzeGame in
-// app/api/analysis/single/route.ts. Same Blunder output shape, with one fix:
-// the old code normalized evals as if the engine score were white-POV, but
-// UCI scores are side-to-move POV — which silently inverted evals for games
+// Client-side port of the retired Lambda-backed analyzeGame (formerly
+// /api/analysis/single). Same Blunder output shape, with one fix: the old
+// code normalized evals as if the engine score were white-POV, but UCI
+// scores are side-to-move POV — which silently inverted evals for games
 // the user played as black. Here both colors normalize correctly.
 
 const MATE_SCORE = 10000;
