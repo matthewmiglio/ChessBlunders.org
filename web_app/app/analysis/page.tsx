@@ -9,8 +9,12 @@ import { toast } from "sonner";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { StatCard } from "@/components/StatCard";
 import { BoardPreview } from "@/components/BoardPreview";
+import { analyzeGameClient } from "@/lib/analysis/analyzeGameClient";
+import { createStockfishNnue } from "@/lib/engines/stockfish-nnue";
+import type { Engine } from "@/lib/engines/types";
 
-const BATCH_SIZE = 20;
+const ANALYSIS_DEPTH = 12;
+const BLUNDER_THRESHOLD_CP = 100;
 
 interface UnanalyzedGame {
   id: string;
@@ -38,6 +42,14 @@ function AnalysisContent() {
   const [analyzeProgress, setAnalyzeProgress] = useState({ current: 0, total: 0 });
   const [retentionLimitReached, setRetentionLimitReached] = useState(false);
   const abortRef = useRef(false);
+  const engineRef = useRef<Engine | null>(null);
+
+  useEffect(() => {
+    return () => {
+      engineRef.current?.dispose();
+      engineRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -136,40 +148,65 @@ function AnalysisContent() {
         total: startingCount + totalToAnalyze
       });
 
+      // The engine runs in the user's browser — no more AWS calls.
+      if (!engineRef.current) {
+        engineRef.current = createStockfishNnue();
+      }
+      try {
+        await engineRef.current.ready();
+      } catch {
+        toast.error("Could not start the analysis engine in this browser");
+        setAnalyzing(false);
+        return;
+      }
+
       let analyzed = 0;
       let failed = 0;
 
-      // Process in batches
-      for (let i = 0; i < unanalyzedGames.length; i += BATCH_SIZE) {
+      // One engine instance — analyze games sequentially
+      for (let i = 0; i < unanalyzedGames.length; i++) {
         if (abortRef.current) {
           toast.info(`Analysis stopped. ${analyzed} games analyzed.`);
           break;
         }
 
-        const batch = unanalyzedGames.slice(i, i + BATCH_SIZE);
+        const game = unanalyzedGames[i];
 
-        const results = await Promise.allSettled(
-          batch.map(game =>
-            fetch("/api/analysis/single", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ gameId: game.id })
-            }).then(res => res.json())
-          )
-        );
+        try {
+          const blunders = await analyzeGameClient(
+            game.pgn,
+            game.user_color,
+            BLUNDER_THRESHOLD_CP,
+            ANALYSIS_DEPTH,
+            engineRef.current,
+            { isAborted: () => abortRef.current }
+          );
 
-        for (const result of results) {
-          if (result.status === "fulfilled" && result.value.success) {
+          if (blunders === null) {
+            // Aborted mid-game; don't save partial results
+            toast.info(`Analysis stopped. ${analyzed} games analyzed.`);
+            break;
+          }
+
+          const response = await fetch("/api/analysis/save", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ gameId: game.id, blunders }),
+          });
+          const result = await response.json();
+
+          if (result.success) {
             analyzed++;
           } else {
             failed++;
-            if (result.status === "fulfilled" && result.value.limitReached) {
+            if (result.limitReached) {
               setRetentionLimitReached(true);
               toast.error("Free analysis limit reached");
               abortRef.current = true;
-              break;
             }
           }
+        } catch {
+          failed++;
         }
 
         setAnalyzeProgress({
@@ -178,7 +215,7 @@ function AnalysisContent() {
         });
 
         // Refresh analyses list periodically
-        if ((i + BATCH_SIZE) % 40 === 0 || i + BATCH_SIZE >= unanalyzedGames.length) {
+        if ((i + 1) % 5 === 0 || i + 1 >= unanalyzedGames.length) {
           fetchAnalyses();
         }
       }
@@ -363,7 +400,7 @@ function AnalysisContent() {
             />
           </div>
           <p className="text-[#b4b4b4] text-xs mt-2">
-            {stopping ? "Analysis will stop after the current batch completes." : `Processing ${BATCH_SIZE} games at a time. You can stop and resume anytime.`}
+            {stopping ? "Analysis will stop after the current game completes." : "Analyzing locally in your browser. You can stop and resume anytime."}
           </p>
         </div>
       )}

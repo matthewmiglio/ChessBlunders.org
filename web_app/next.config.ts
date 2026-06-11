@@ -38,6 +38,20 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        source: "/analysis",
+        headers: [
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Embedder-Policy", value: "credentialless" },
+        ],
+      },
+      {
+        source: "/analysis/:path*",
+        headers: [
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Embedder-Policy", value: "credentialless" },
+        ],
+      },
+      {
         source: "/engines/:path*",
         headers: [
           { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
