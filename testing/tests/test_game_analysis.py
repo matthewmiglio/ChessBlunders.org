@@ -58,10 +58,23 @@ async def main() -> None:
         if not isolated:
             failures.append("crossOriginIsolated is false")
 
-        await page.fill('[data-testid="position-input"]', PGN)
-        await page.wait_for_timeout(500)
+        # Filling before React hydrates silently drops the input — wait for the
+        # page to be interactive, then fill (retrying once if the PGN-only
+        # button doesn't show up).
+        await page.wait_for_selector('[data-testid="analyze-button"]', timeout=30_000)
+        await page.wait_for_timeout(1500)
 
-        button = await page.query_selector('[data-testid="analyze-game-button"]')
+        button = None
+        for attempt in range(2):
+            await page.fill('[data-testid="position-input"]', PGN)
+            try:
+                button = await page.wait_for_selector(
+                    '[data-testid="analyze-game-button"]', timeout=10_000
+                )
+                break
+            except Exception:
+                print(f"[game-analysis] ANALYZE GAME button not visible (attempt {attempt + 1})")
+
         if not button:
             failures.append("ANALYZE GAME button did not appear for PGN input")
         else:
