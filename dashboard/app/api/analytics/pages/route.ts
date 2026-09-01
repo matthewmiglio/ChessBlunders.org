@@ -1,10 +1,10 @@
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const { data, error } = await supabase.rpc("get_pageviews_by_path_all_time");
+  const { data, error } = await supabaseAdmin.rpc("get_pageviews_by_path_all_time");
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
