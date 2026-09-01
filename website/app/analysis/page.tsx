@@ -12,6 +12,7 @@ import { BoardPreview } from "@/components/BoardPreview";
 import { analyzeGameClient } from "@/lib/analysis/analyzeGameClient";
 import { createStockfishNnue } from "@/lib/engines/stockfish-nnue";
 import type { Engine } from "@/lib/engines/types";
+import { useCrossOriginIsolationReload } from "@/lib/hooks/useCrossOriginIsolationReload";
 
 const ANALYSIS_DEPTH = 12;
 const BLUNDER_THRESHOLD_CP = 100;
@@ -23,6 +24,9 @@ interface UnanalyzedGame {
 }
 
 function AnalysisContent() {
+  // Force cross-origin isolation before the Stockfish engine is touched.
+  useCrossOriginIsolationReload();
+
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
