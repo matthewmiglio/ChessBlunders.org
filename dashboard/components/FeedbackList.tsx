@@ -35,7 +35,7 @@ export function FeedbackList() {
 
   if (loading) {
     return (
-      <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
+      <div className="bg-gray-100/50 rounded-xl p-6 border border-gray-200">
         <p className="text-gray-400">Loading feedback...</p>
       </div>
     );
@@ -43,17 +43,17 @@ export function FeedbackList() {
 
   if (feedback.length === 0) {
     return (
-      <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
+      <div className="bg-gray-100/50 rounded-xl p-6 border border-gray-200">
         <p className="text-gray-400">No feedback yet.</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-800/50 rounded-xl border border-gray-700 overflow-hidden">
-      <div className="divide-y divide-gray-700">
+    <div className="bg-gray-100/50 rounded-xl border border-gray-200 overflow-hidden">
+      <div className="divide-y divide-gray-200">
         {feedback.map((item) => (
-          <div key={item.id} className="p-4 hover:bg-gray-700/30">
+          <div key={item.id} className="p-4 hover:bg-gray-100/30">
             {/* Header */}
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
@@ -76,7 +76,7 @@ export function FeedbackList() {
             <p className="text-sm text-gray-400 mb-2">{item.name}</p>
 
             {/* Message */}
-            <p className="text-gray-200 whitespace-pre-wrap">{item.text}</p>
+            <p className="text-gray-900 whitespace-pre-wrap">{item.text}</p>
           </div>
         ))}
       </div>

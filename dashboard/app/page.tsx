@@ -44,9 +44,9 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-10">
+      <header className="border-b border-gray-200 bg-gray-50/95 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 py-4">
-          <h1 className="text-xl font-bold text-white">ChessBlunders Analytics</h1>
+          <h1 className="text-xl font-bold text-gray-900">ChessBlunders Analytics</h1>
           <p className="text-sm text-gray-400">All-time statistics</p>
         </div>
       </header>
@@ -55,13 +55,13 @@ export default function Dashboard() {
       <main className="max-w-7xl mx-auto px-6 py-8">
         {/* Period Comparison */}
         <section className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-100 mb-4">Recent Trends</h2>
+          <h2 className="text-sm font-bold uppercase tracking-[0.15em] text-gray-900 mb-4">Recent Trends</h2>
           <PeriodComparison />
         </section>
 
         {/* Summary Stats */}
         <section className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-100 mb-4">Overview</h2>
+          <h2 className="text-sm font-bold uppercase tracking-[0.15em] text-gray-900 mb-4">Overview</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {loading ? (
               <>
@@ -76,19 +76,19 @@ export default function Dashboard() {
                   title="Total Page Views"
                   value={summary?.total_views?.toLocaleString() || "0"}
                   subtitle="All time"
-                  color="sky"
+                  color="indigo"
                 />
                 <StatCard
                   title="Unique Visitors"
                   value={summary?.unique_visitors?.toLocaleString() || "0"}
                   subtitle="By visitor ID"
-                  color="emerald"
+                  color="green"
                 />
                 <StatCard
                   title="Sessions"
                   value={summary?.unique_sessions?.toLocaleString() || "0"}
                   subtitle="Unique sessions"
-                  color="violet"
+                  color="purple"
                 />
                 <StatCard
                   title="Top Page"
@@ -103,13 +103,13 @@ export default function Dashboard() {
 
         {/* Page Views Chart */}
         <section className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-100 mb-4">Traffic Over Time</h2>
+          <h2 className="text-sm font-bold uppercase tracking-[0.15em] text-gray-900 mb-4">Traffic Over Time</h2>
           <PageViewsChart />
         </section>
 
         {/* Bottom Charts */}
         <section className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-100 mb-4">Breakdown</h2>
+          <h2 className="text-sm font-bold uppercase tracking-[0.15em] text-gray-900 mb-4">Breakdown</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <TopPagesChart />
             <TopCountriesChart />
@@ -118,7 +118,7 @@ export default function Dashboard() {
 
         {/* Usage Statistics */}
         <section className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-100 mb-4">
+          <h2 className="text-sm font-bold uppercase tracking-[0.15em] text-gray-900 mb-4">
             Usage Statistics
           </h2>
           <UsageStatsCards />
@@ -126,7 +126,7 @@ export default function Dashboard() {
 
         {/* Usage Over Time Charts */}
         <section className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-100 mb-4">Usage Over Time</h2>
+          <h2 className="text-sm font-bold uppercase tracking-[0.15em] text-gray-900 mb-4">Usage Over Time</h2>
           <div className="space-y-6">
             <GamesOverTimeChart />
             <AnalysesOverTimeChart />
@@ -137,7 +137,7 @@ export default function Dashboard() {
 
         {/* Game & Practice Analytics */}
         <section className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-100 mb-4">Game & Practice Analytics</h2>
+          <h2 className="text-sm font-bold uppercase tracking-[0.15em] text-gray-900 mb-4">Game & Practice Analytics</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <GameResultsPieChart />
             <UserActivityPieChart />
@@ -150,13 +150,13 @@ export default function Dashboard() {
 
         {/* User Growth */}
         <section className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-100 mb-4">User Growth</h2>
+          <h2 className="text-sm font-bold uppercase tracking-[0.15em] text-gray-900 mb-4">User Growth</h2>
           <CumulativeUsersChart />
         </section>
 
         {/* Subscription & Revenue Stats */}
         <section className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-100 mb-4">
+          <h2 className="text-sm font-bold uppercase tracking-[0.15em] text-gray-900 mb-4">
             Subscriptions & Revenue
           </h2>
           <SubscriptionStats />
@@ -164,7 +164,7 @@ export default function Dashboard() {
 
         {/* User Feedback */}
         <section>
-          <h2 className="text-lg font-semibold text-gray-100 mb-4">
+          <h2 className="text-sm font-bold uppercase tracking-[0.15em] text-gray-900 mb-4">
             User Feedback
           </h2>
           <FeedbackList />
@@ -172,8 +172,8 @@ export default function Dashboard() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-gray-800 mt-12">
-        <div className="max-w-7xl mx-auto px-6 py-4 text-center text-sm text-gray-500">
+      <footer className="border-t border-gray-200 mt-12">
+        <div className="max-w-7xl mx-auto px-6 py-4 text-center text-sm text-gray-400">
           ChessBlunders.org Analytics Dashboard
         </div>
       </footer>

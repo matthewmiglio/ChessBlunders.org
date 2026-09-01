@@ -33,17 +33,17 @@ export function EngineUsageOverTime() {
 
   if (loading) {
     return (
-      <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 animate-pulse">
-        <div className="h-4 bg-gray-700 rounded w-1/3 mb-4"></div>
-        <div className="h-48 bg-gray-800 rounded"></div>
+      <div className="bg-gray-50 rounded-xl shadow-md shadow-gray-300/30 p-5 border border-gray-200 animate-pulse">
+        <div className="h-4 bg-gray-200 rounded w-1/3 mb-4"></div>
+        <div className="h-48 bg-gray-200 rounded"></div>
       </div>
     );
   }
 
   if (data.length === 0) {
     return (
-      <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-        <h3 className="text-sm font-bold text-gray-100 mb-4">Engine Usage Over Time</h3>
+      <div className="bg-gray-50 rounded-xl shadow-md shadow-gray-300/30 p-5 border border-gray-200">
+        <h3 className="text-sm font-bold text-gray-900 mb-4">Engine Usage Over Time</h3>
         <p className="text-gray-500 text-sm">No data available</p>
       </div>
     );
@@ -79,9 +79,9 @@ export function EngineUsageOverTime() {
   const areaPath = `${linePath} L ${chartWidth} ${chartHeight} L 0 ${chartHeight} Z`;
 
   return (
-    <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
+    <div className="bg-gray-50 rounded-xl shadow-md shadow-gray-300/30 p-5 border border-gray-200">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-bold text-gray-100">Engine Usage Over Time</h3>
+        <h3 className="text-sm font-bold text-gray-900">Engine Usage Over Time</h3>
         <span className="text-sm text-gray-400">{total.toLocaleString()} total calls</span>
       </div>
       <div className="flex">
@@ -110,19 +110,19 @@ export function EngineUsageOverTime() {
                   y1={y}
                   x2={chartWidth}
                   y2={y}
-                  stroke="#374151"
+                  stroke="#e1e0d9"
                   strokeWidth="1"
                   strokeDasharray="4 4"
                 />
               );
             })}
             {/* Area fill */}
-            <path d={areaPath} fill="rgba(249, 115, 22, 0.1)" />
+            <path d={areaPath} fill="rgba(28, 92, 171, 0.1)" />
             {/* Line */}
             <path
               d={linePath}
               fill="none"
-              stroke="#f97316"
+              stroke="#1c5cab"
               strokeWidth="2"
               vectorEffect="non-scaling-stroke"
             />
@@ -133,7 +133,7 @@ export function EngineUsageOverTime() {
                   cx={p.x}
                   cy={p.y}
                   r="4"
-                  fill="#f97316"
+                  fill="#1c5cab"
                   className="opacity-0 group-hover:opacity-100 transition-opacity"
                   style={{ vectorEffect: "non-scaling-stroke" }}
                 />

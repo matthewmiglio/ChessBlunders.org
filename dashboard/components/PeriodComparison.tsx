@@ -50,15 +50,15 @@ export function PeriodComparison() {
       : 0;
 
   return (
-    <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-      <h3 className="text-sm font-bold text-gray-100 mb-1">10-Day Comparison</h3>
+    <div className="bg-gray-50 rounded-xl shadow-md shadow-gray-300/30 p-5 border border-gray-200">
+      <h3 className="text-sm font-bold text-gray-900 mb-1">10-Day Comparison</h3>
       <p className="text-gray-500 text-xs mb-5">Last 10 days vs previous 10 days</p>
 
       <div className="grid grid-cols-2 gap-6">
         <div>
           <p className="text-gray-400 text-xs mb-2">Unique Visitors</p>
           <div className="flex items-baseline gap-3">
-            <span className="text-2xl font-bold text-white">
+            <span className="text-2xl font-bold text-gray-900">
               {current.unique_visitors.toLocaleString()}
             </span>
             <ChangeIndicator value={visitorChange} />
@@ -71,7 +71,7 @@ export function PeriodComparison() {
         <div>
           <p className="text-gray-400 text-xs mb-2">Page Views</p>
           <div className="flex items-baseline gap-3">
-            <span className="text-2xl font-bold text-white">
+            <span className="text-2xl font-bold text-gray-900">
               {current.total_pageviews.toLocaleString()}
             </span>
             <ChangeIndicator value={pageviewChange} />
@@ -104,17 +104,17 @@ function ChangeIndicator({ value }: { value: number }) {
 
 function PeriodComparisonSkeleton() {
   return (
-    <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-      <div className="h-4 w-32 bg-gray-800 rounded animate-pulse mb-1" />
-      <div className="h-3 w-48 bg-gray-800 rounded animate-pulse mb-5" />
+    <div className="bg-gray-50 rounded-xl shadow-md shadow-gray-300/30 p-5 border border-gray-200">
+      <div className="h-4 w-32 bg-gray-200 rounded animate-pulse mb-1" />
+      <div className="h-3 w-48 bg-gray-200 rounded animate-pulse mb-5" />
       <div className="grid grid-cols-2 gap-6">
         <div>
-          <div className="h-3 w-20 bg-gray-800 rounded animate-pulse mb-2" />
-          <div className="h-8 w-28 bg-gray-800 rounded animate-pulse" />
+          <div className="h-3 w-20 bg-gray-200 rounded animate-pulse mb-2" />
+          <div className="h-8 w-28 bg-gray-200 rounded animate-pulse" />
         </div>
         <div>
-          <div className="h-3 w-20 bg-gray-800 rounded animate-pulse mb-2" />
-          <div className="h-8 w-28 bg-gray-800 rounded animate-pulse" />
+          <div className="h-3 w-20 bg-gray-200 rounded animate-pulse mb-2" />
+          <div className="h-8 w-28 bg-gray-200 rounded animate-pulse" />
         </div>
       </div>
     </div>

@@ -9,9 +9,9 @@ interface ActivityData {
 
 const BUCKET_ORDER = ["Last 24 hours", "Last 7 days", "7+ days ago"];
 const BUCKET_COLORS: Record<string, string> = {
-  "Last 24 hours": "#10b981",  // emerald - most active
-  "Last 7 days": "#0ea5e9",    // sky - moderately active
-  "7+ days ago": "#6b7280",    // gray - inactive
+  "Last 24 hours": "#1c7a3d",  // ink green - most active
+  "Last 7 days": "#1c5cab",    // ink blue - moderately active
+  "7+ days ago": "#898781",    // ink gray - inactive
 };
 
 export function UserActivityPieChart() {
@@ -36,17 +36,17 @@ export function UserActivityPieChart() {
 
   if (loading) {
     return (
-      <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 animate-pulse">
-        <div className="h-4 bg-gray-700 rounded w-1/3 mb-4"></div>
-        <div className="h-48 bg-gray-800 rounded"></div>
+      <div className="bg-gray-50 rounded-xl shadow-md shadow-gray-300/30 p-5 border border-gray-200 animate-pulse">
+        <div className="h-4 bg-gray-200 rounded w-1/3 mb-4"></div>
+        <div className="h-48 bg-gray-200 rounded"></div>
       </div>
     );
   }
 
   if (data.length === 0) {
     return (
-      <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-        <h3 className="text-sm font-bold text-gray-100 mb-4">User Activity</h3>
+      <div className="bg-gray-50 rounded-xl shadow-md shadow-gray-300/30 p-5 border border-gray-200">
+        <h3 className="text-sm font-bold text-gray-900 mb-4">User Activity</h3>
         <p className="text-gray-500 text-sm">No data available</p>
       </div>
     );
@@ -93,9 +93,9 @@ export function UserActivityPieChart() {
   }
 
   return (
-    <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
+    <div className="bg-gray-50 rounded-xl shadow-md shadow-gray-300/30 p-5 border border-gray-200">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-bold text-gray-100">User Activity (by Practice)</h3>
+        <h3 className="text-sm font-bold text-gray-900">User Activity (by Practice)</h3>
         <span className="text-sm text-gray-400">{total.toLocaleString()} users</span>
       </div>
       <div className="flex items-center gap-6">
@@ -111,7 +111,7 @@ export function UserActivityPieChart() {
                   cx={center}
                   cy={center}
                   r={radius}
-                  fill={BUCKET_COLORS[seg.activity_bucket] || "#6b7280"}
+                  fill={BUCKET_COLORS[seg.activity_bucket] || "#898781"}
                 />
               );
             }
@@ -120,14 +120,14 @@ export function UserActivityPieChart() {
               <path
                 key={i}
                 d={describeArc(center, center, radius, startAngle, endAngle)}
-                fill={BUCKET_COLORS[seg.activity_bucket] || "#6b7280"}
+                fill={BUCKET_COLORS[seg.activity_bucket] || "#898781"}
                 className="hover:opacity-80 transition-opacity"
               >
                 <title>{`${seg.activity_bucket}: ${seg.user_count.toLocaleString()} (${seg.percent.toFixed(1)}%)`}</title>
               </path>
             );
           })}
-          <circle cx={center} cy={center} r={35} fill="#111827" />
+          <circle cx={center} cy={center} r={35} fill="#fcfcfb" />
         </svg>
         {/* Legend */}
         <div className="flex flex-col gap-2">
@@ -135,9 +135,9 @@ export function UserActivityPieChart() {
             <div key={i} className="flex items-center gap-2">
               <div
                 className="w-3 h-3 rounded-sm"
-                style={{ backgroundColor: BUCKET_COLORS[seg.activity_bucket] || "#6b7280" }}
+                style={{ backgroundColor: BUCKET_COLORS[seg.activity_bucket] || "#898781" }}
               />
-              <span className="text-sm text-gray-300">
+              <span className="text-sm text-gray-700">
                 {seg.activity_bucket}
               </span>
               <span className="text-sm text-gray-500">

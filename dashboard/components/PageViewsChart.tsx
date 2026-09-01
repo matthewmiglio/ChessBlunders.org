@@ -35,9 +35,9 @@ export function PageViewsChart() {
 
   if (loading) {
     return (
-      <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 animate-pulse">
-        <div className="h-4 bg-gray-700 rounded w-1/3 mb-4"></div>
-        <div className="h-48 bg-gray-800 rounded"></div>
+      <div className="bg-gray-50 rounded-xl shadow-md shadow-gray-300/30 p-5 border border-gray-200 animate-pulse">
+        <div className="h-4 bg-gray-200 rounded w-1/3 mb-4"></div>
+        <div className="h-48 bg-gray-200 rounded"></div>
       </div>
     );
   }
@@ -50,9 +50,9 @@ export function PageViewsChart() {
   const chartHeight = 200;
 
   return (
-    <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
+    <div className="bg-gray-50 rounded-xl shadow-md shadow-gray-300/30 p-5 border border-gray-200">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-bold text-gray-100">Daily Page Views</h3>
+        <h3 className="text-sm font-bold text-gray-900">Daily Page Views</h3>
         <span className="text-sm text-gray-400">{total.toLocaleString()} total</span>
       </div>
       <div className="flex">
@@ -76,10 +76,10 @@ export function PageViewsChart() {
               >
                 <div className="relative w-full flex items-end justify-center h-full">
                   <div
-                    className="w-full bg-sky-500 rounded-t hover:bg-sky-400 transition-colors"
+                    className="w-full bg-indigo-500 rounded-t hover:bg-indigo-400 transition-colors"
                     style={{ height: `${Math.max(barHeight, 4)}px` }}
                   />
-                  <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                  <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-gray-100 text-gray-900 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
                     {point.views} views
                   </div>
                 </div>

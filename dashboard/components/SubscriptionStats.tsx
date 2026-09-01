@@ -50,7 +50,7 @@ export function SubscriptionStats() {
 
   if (error) {
     return (
-      <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-6 text-red-400">
+      <div className="bg-red-400/10 border border-red-400/40 rounded-xl p-6 text-red-600">
         <p className="font-medium">Failed to load subscription stats</p>
         <p className="text-sm text-red-500 mt-1">{error}</p>
       </div>
@@ -61,7 +61,7 @@ export function SubscriptionStats() {
     <div className="space-y-6">
       {/* User Stats */}
       <div>
-        <h3 className="text-md font-medium text-gray-300 mb-3">
+        <h3 className="text-md font-medium text-gray-700 mb-3">
           User Metrics
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -105,7 +105,7 @@ export function SubscriptionStats() {
 
       {/* Revenue Stats */}
       <div>
-        <h3 className="text-md font-medium text-gray-300 mb-3">
+        <h3 className="text-md font-medium text-gray-700 mb-3">
           Revenue Metrics
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -148,40 +148,40 @@ export function SubscriptionStats() {
       </div>
 
       {/* Detailed Stats Table */}
-      <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-800">
-          <h3 className="text-md font-medium text-gray-300">Detailed Breakdown</h3>
+      <div className="bg-gray-50 rounded-xl shadow-md shadow-gray-300/30 border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-md font-medium text-gray-700">Detailed Breakdown</h3>
         </div>
-        <div className="divide-y divide-gray-800">
+        <div className="divide-y divide-gray-200">
           {loading ? (
             <div className="p-6 animate-pulse">
-              <div className="h-4 bg-gray-700 rounded w-1/2 mb-3"></div>
-              <div className="h-4 bg-gray-700 rounded w-2/3 mb-3"></div>
-              <div className="h-4 bg-gray-700 rounded w-1/3"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/2 mb-3"></div>
+              <div className="h-4 bg-gray-200 rounded w-2/3 mb-3"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/3"></div>
             </div>
           ) : (
             <>
               <div className="px-6 py-3 flex justify-between">
                 <span className="text-gray-400">Total Users</span>
-                <span className="text-gray-100 font-medium">
+                <span className="text-gray-900 font-medium">
                   {stats?.users.total.toLocaleString()}
                 </span>
               </div>
               <div className="px-6 py-3 flex justify-between">
                 <span className="text-gray-400">Ever Subscribed</span>
-                <span className="text-gray-100 font-medium">
+                <span className="text-gray-900 font-medium">
                   {stats?.users.everSubscribed.toLocaleString()}
                 </span>
               </div>
               <div className="px-6 py-3 flex justify-between">
                 <span className="text-gray-400">Currently Active</span>
-                <span className="text-emerald-400 font-medium">
+                <span className="text-green-400 font-medium">
                   {stats?.users.activeSubscribers.toLocaleString()}
                 </span>
               </div>
               <div className="px-6 py-3 flex justify-between">
                 <span className="text-gray-400">Healthy Subscribers</span>
-                <span className="text-emerald-400 font-medium">
+                <span className="text-green-400 font-medium">
                   {stats?.users.healthySubscribers.toLocaleString()}
                 </span>
               </div>
@@ -193,25 +193,25 @@ export function SubscriptionStats() {
               </div>
               <div className="px-6 py-3 flex justify-between">
                 <span className="text-gray-400">Fully Canceled</span>
-                <span className="text-violet-400 font-medium">
+                <span className="text-purple-400 font-medium">
                   {stats?.users.canceled.toLocaleString()}
                 </span>
               </div>
-              <div className="px-6 py-3 flex justify-between border-t border-gray-700">
+              <div className="px-6 py-3 flex justify-between border-t border-gray-200">
                 <span className="text-gray-400">Subscription Rate</span>
-                <span className="text-gray-100 font-medium">
+                <span className="text-gray-900 font-medium">
                   {stats?.users.subscriptionRate}%
                 </span>
               </div>
               <div className="px-6 py-3 flex justify-between">
                 <span className="text-gray-400">Churn Rate</span>
-                <span className="text-gray-100 font-medium">
+                <span className="text-gray-900 font-medium">
                   {stats?.users.churnRate}%
                 </span>
               </div>
-              <div className="px-6 py-3 flex justify-between border-t border-gray-700">
+              <div className="px-6 py-3 flex justify-between border-t border-gray-200">
                 <span className="text-gray-400">ARPU (Avg Revenue Per User)</span>
-                <span className="text-gray-100 font-medium">
+                <span className="text-gray-900 font-medium">
                   ${stats?.revenue.arpu}
                 </span>
               </div>
