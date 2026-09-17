@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
-import { stripe } from '@/lib/stripe';
+import { stripe, isChessBlundersSubscription } from '@/lib/stripe';
 import Stripe from 'stripe';
 
 export async function POST(req: NextRequest) {
@@ -24,6 +24,11 @@ export async function POST(req: NextRequest) {
 
     if (!profile.cancel_at_period_end) {
       return NextResponse.json({ error: 'Subscription is not set to cancel' }, { status: 400 });
+    }
+
+    const subscription = await stripe.subscriptions.retrieve(profile.stripe_subscription_id);
+    if (!isChessBlundersSubscription(subscription)) {
+      return NextResponse.json({ error: 'No subscription found' }, { status: 400 });
     }
 
     // Remove the cancellation

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
-import { stripe } from '@/lib/stripe';
+import { stripe, isChessBlundersSubscription } from '@/lib/stripe';
 import Stripe from 'stripe';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 
@@ -31,6 +31,9 @@ export async function POST(req: NextRequest) {
 
     // First, check the subscription status in Stripe
     const subscription = await stripe.subscriptions.retrieve(profile.stripe_subscription_id);
+    if (!isChessBlundersSubscription(subscription)) {
+      return NextResponse.json({ error: 'No subscription found' }, { status: 400 });
+    }
 
     // If already canceled, sync the database and return success
     if (subscription.status === 'canceled') {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import Stripe from 'stripe';
-import { stripe } from '@/lib/stripe';
+import { stripe, isChessBlundersSubscription } from '@/lib/stripe';
 import { createClient } from '@supabase/supabase-js';
 
 // Type workarounds for Stripe SDK type issues
@@ -125,7 +125,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   const userId = subscription.metadata.supabase_user_id;
 
-  if (!userId) {
+  if (!userId || !isChessBlundersSubscription(subscription)) {
     return;
   }
 
@@ -160,7 +160,7 @@ async function handleInvoicePaid(invoice: InvoiceWithSubscription) {
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   const userId = subscription.metadata.supabase_user_id;
 
-  if (!userId) {
+  if (!userId || !isChessBlundersSubscription(subscription)) {
     return;
   }
 
@@ -190,7 +190,7 @@ async function handlePaymentFailed(invoice: InvoiceWithSubscription) {
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   const userId = subscription.metadata.supabase_user_id;
 
-  if (!userId) {
+  if (!userId || !isChessBlundersSubscription(subscription)) {
     return;
   }
 
@@ -209,11 +209,12 @@ async function handlePaymentFailed(invoice: InvoiceWithSubscription) {
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const userId = subscription.metadata.supabase_user_id;
-  const period = getSubscriptionPeriod(subscription);
 
-  if (!userId) {
+  if (!userId || !isChessBlundersSubscription(subscription)) {
     return;
   }
+
+  const period = getSubscriptionPeriod(subscription);
 
   const { error } = await supabaseAdmin
     .from('profiles')
@@ -235,7 +236,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const userId = subscription.metadata.supabase_user_id;
 
-  if (!userId) {
+  if (!userId || !isChessBlundersSubscription(subscription)) {
     return;
   }
 
