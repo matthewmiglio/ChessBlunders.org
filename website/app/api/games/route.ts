@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
-import { checkPremiumAccess } from "@/lib/premium";
+import { fetchAllRows } from "@/lib/limits";
 
-const MAX_FREE_GAMES = 100;
-const MAX_PREMIUM_GAMES = 1000;
+// Importing "all" games walks every Chess.com monthly archive, which can take a while.
+export const maxDuration = 300;
+
+const INSERT_CHUNK = 500;
 
 // GET /api/games - Fetch user's games
 export async function GET(request: NextRequest) {
@@ -19,38 +21,38 @@ export async function GET(request: NextRequest) {
     const limitParam = searchParams.get("limit");
     const offset = parseInt(searchParams.get("offset") || "0");
 
-    // Build query for games
-    let query = supabase
+    const gamesQuery = () => supabase
       .from("games")
       .select("*")
       .eq("user_id", user.id)
-      .order("played_at", { ascending: false });
+      .order("played_at", { ascending: false })
+      .order("id");
 
-    // Only apply range if limit is specified (otherwise fetch all)
-    if (limitParam) {
-      const limit = parseInt(limitParam);
-      query = query.range(offset, offset + limit - 1);
-    }
-
-    const { data: games, error: gamesError } = await query;
+    // Only apply range if limit is specified (otherwise fetch all, paging past the 1000-row cap)
+    const { data: games, error: gamesError } = limitParam
+      ? await gamesQuery().range(offset, offset + parseInt(limitParam) - 1)
+      : await fetchAllRows((from, to) => gamesQuery().range(from, to));
 
     if (gamesError) {
       return NextResponse.json({ error: "Failed to fetch games" }, { status: 500 });
     }
 
-    // Fetch analysis records separately to get analysis_id for each game
-    const gameIds = games?.map(g => g.id) || [];
+    // Fetch analysis records separately to get analysis_id for each game.
+    // Query by user rather than .in(gameIds): thousands of ids overflow the request URL.
     let analysisMap: Record<string, string> = {};
 
-    if (gameIds.length > 0) {
-      const { data: analysisRecords, error: analysisError } = await supabase
-        .from("analysis")
-        .select("id, game_id")
-        .in("game_id", gameIds);
+    if (games && games.length > 0) {
+      const { data: analysisRecords, error: analysisError } = await fetchAllRows<{ id: string; game_id: string }>(
+        (from, to) => supabase
+          .from("analysis")
+          .select("id, game_id")
+          .eq("user_id", user.id)
+          .order("id")
+          .range(from, to)
+      );
 
-      if (analysisError) {
-        // Continue without analysis data rather than failing
-      } else if (analysisRecords) {
+      if (!analysisError) {
+        // On error, continue without analysis data rather than failing
         analysisMap = Object.fromEntries(analysisRecords.map(a => [a.game_id, a.id]));
       }
     }
@@ -93,13 +95,9 @@ export async function POST(request: NextRequest) {
   try {
     const { count } = await request.json();
 
-    // Check premium status for game limits
-    const isPremium = await checkPremiumAccess();
-
-    // Determine the game limit (capped for all users)
-    const requestedCount = parseInt(count) || 50;
-    const maxAllowed = isPremium ? MAX_PREMIUM_GAMES : MAX_FREE_GAMES;
-    const gameLimit = Math.min(requestedCount, maxAllowed);
+    // No import cap: the user picks how many recent games to pull, or "all"
+    const requested = parseInt(count);
+    const gameLimit = count === "all" ? Infinity : requested > 0 ? requested : 50;
 
     // Get archives list (sorted newest to oldest)
     const archivesUrl = `https://api.chess.com/pub/player/${profile.chess_username}/games/archives`;
@@ -161,24 +159,22 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    // Bulk insert games using RPC
+    // Bulk insert games using RPC, in chunks so a full-history import stays a sane payload size
     let totalImported = 0;
-    if (transformedGames.length > 0) {
+    for (let i = 0; i < transformedGames.length; i += INSERT_CHUNK) {
       const { data: insertedCount, error } = await supabase.rpc(
         "bulk_insert_games",
-        { p_games: transformedGames }
+        { p_games: transformedGames.slice(i, i + INSERT_CHUNK) }
       );
 
       if (!error && insertedCount) {
-        totalImported = insertedCount;
+        totalImported += insertedCount;
       }
     }
 
     return NextResponse.json({
       imported: totalImported,
       total: allGames.length,
-      limited: !isPremium && requestedCount > MAX_FREE_GAMES,
-      maxFreeGames: MAX_FREE_GAMES,
     });
   } catch (error) {
     return NextResponse.json(

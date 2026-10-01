@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase-server';
 import { redirect } from 'next/navigation';
 import SubscriptionManager from '@/components/SubscriptionManager';
+import ChessAccountCard from '@/components/ChessAccountCard';
 
 // Disable caching - always fetch fresh subscription data
 export const dynamic = 'force-dynamic';
@@ -29,6 +30,8 @@ export default async function AccountPage() {
   return (
     <div className="max-w-2xl mx-auto">
       <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#f5f5f5] mb-8">Account Settings</h1>
+
+      <ChessAccountCard />
 
       <SubscriptionManager
         profile={profile}

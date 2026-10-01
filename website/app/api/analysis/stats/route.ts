@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { checkPremiumAccess } from "@/lib/premium";
-
-const MAX_FREE_ANALYSES = 100;
+import { FREE_MONTHLY_ANALYSES, currentMonthStart, nextMonthStart } from "@/lib/limits";
 
 export async function GET() {
   const supabase = await createClient();
@@ -27,10 +26,19 @@ export async function GET() {
     .select("*", { count: "exact", head: true })
     .eq("user_id", user.id);
 
+  // Analyses this calendar month, which is what the free limit counts
+  const { count: analyzedThisMonth } = await supabase
+    .from("analysis")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .gte("analyzed_at", currentMonthStart().toISOString());
+
   return NextResponse.json({
     totalGames: totalGames || 0,
     analyzedGames: analyzedGames || 0,
+    analyzedThisMonth: analyzedThisMonth || 0,
     isPremium,
-    retentionLimit: isPremium ? null : MAX_FREE_ANALYSES,
+    monthlyLimit: isPremium ? null : FREE_MONTHLY_ANALYSES,
+    limitResetsAt: nextMonthStart().toISOString(),
   });
 }

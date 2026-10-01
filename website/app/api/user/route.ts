@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
+import { CHESS_USERNAME_RE, chessUsernameExists } from "@/lib/chess-username";
 
 // GET /api/user - Get current user profile
 export async function GET() {
@@ -33,7 +34,7 @@ export async function GET() {
   });
 }
 
-// PATCH /api/user - Update user profile (chess username)
+// PATCH /api/user - Update user profile (chess username), optionally deleting all imported games
 export async function PATCH(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -43,9 +44,9 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
-    const { chessUsername } = await request.json();
+    const { chessUsername, deleteGames } = await request.json();
 
-    if (!chessUsername || typeof chessUsername !== "string") {
+    if (typeof chessUsername !== "string" || !CHESS_USERNAME_RE.test(chessUsername)) {
       return NextResponse.json(
         { error: "Valid chess username required" },
         { status: 400 }
@@ -53,36 +54,27 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Validate username exists on Chess.com
-    const validateResponse = await fetch(
-      `https://api.chess.com/pub/player/${chessUsername}`,
-      {
-        headers: {
-          "User-Agent": "ChessBlunders.org/1.0",
-        },
-      }
-    );
-
-    if (!validateResponse.ok) {
+    if (!(await chessUsernameExists(chessUsername))) {
       return NextResponse.json(
         { error: "Chess.com username not found" },
         { status: 400 }
       );
     }
 
-    // Update using RPC
-    const { data: success, error } = await supabase.rpc(
-      "update_chess_username",
-      { p_chess_username: chessUsername }
+    // Update (and optionally delete old games) in one transaction
+    const { data: deletedGames, error } = await supabase.rpc(
+      "switch_chess_username",
+      { p_chess_username: chessUsername, p_delete_games: deleteGames === true }
     );
 
-    if (error || !success) {
+    if (error) {
       return NextResponse.json(
         { error: "Failed to update username" },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ success: true, chessUsername });
+    return NextResponse.json({ success: true, chessUsername, deletedGames });
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to update profile" },

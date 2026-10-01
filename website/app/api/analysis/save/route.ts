@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { checkPremiumAccess } from "@/lib/premium";
 import { Blunder } from "@/lib/supabase";
+import { FREE_MONTHLY_ANALYSES, currentMonthStart } from "@/lib/limits";
 
 export const dynamic = "force-dynamic";
 
-const MAX_FREE_ANALYSES = 100;
 const MAX_BLUNDERS_PER_GAME = 200;
 const THRESHOLD_CP = 100;
 
@@ -72,17 +72,18 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Check retention limit for free users
+    // Check monthly limit for free users
     const isPremium = await checkPremiumAccess();
     if (!isPremium) {
       const { count } = await supabase
         .from("analysis")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .gte("analyzed_at", currentMonthStart().toISOString());
 
-      if ((count || 0) >= MAX_FREE_ANALYSES) {
+      if ((count || 0) >= FREE_MONTHLY_ANALYSES) {
         return NextResponse.json(
-          { error: "Free analysis limit reached", limitReached: true },
+          { error: "Monthly analysis limit reached", limitReached: true },
           { status: 403 }
         );
       }

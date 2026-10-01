@@ -139,13 +139,13 @@ export default function SubscriptionManager({
             </thead>
             <tbody className="divide-y divide-white/5">
               <tr>
-                <td className="px-4 py-3 text-sm text-[#f5f5f5]">Game Import Limit</td>
-                <td className="px-4 py-3 text-center text-sm text-[#b4b4b4]">100 games</td>
-                <td className="px-4 py-3 text-center text-sm text-[#18be5d]">1,000 games</td>
+                <td className="px-4 py-3 text-sm text-[#f5f5f5]">Game Imports</td>
+                <td className="px-4 py-3 text-center text-sm text-[#b4b4b4]">Unlimited</td>
+                <td className="px-4 py-3 text-center text-sm text-[#18be5d]">Unlimited</td>
               </tr>
               <tr>
-                <td className="px-4 py-3 text-sm text-[#f5f5f5]">Game Retention</td>
-                <td className="px-4 py-3 text-center text-sm text-[#b4b4b4]">100 games</td>
+                <td className="px-4 py-3 text-sm text-[#f5f5f5]">Analyses</td>
+                <td className="px-4 py-3 text-center text-sm text-[#b4b4b4]">200 / month</td>
                 <td className="px-4 py-3 text-center text-sm text-[#18be5d]">Unlimited</td>
               </tr>
               <tr>
@@ -263,13 +263,7 @@ export default function SubscriptionManager({
             <svg className="w-4 h-4 text-[#18be5d] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-            Import up to 1,000 games (vs 100 for free)
-          </li>
-          <li className="flex items-center gap-3 text-sm text-[#f5f5f5]">
-            <svg className="w-4 h-4 text-[#18be5d] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            Unlimited game retention (vs 100 for free)
+            Unlimited analyses (vs 200/month for free)
           </li>
           <li className="flex items-center gap-3 text-sm text-[#f5f5f5]">
             <svg className="w-4 h-4 text-[#18be5d] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

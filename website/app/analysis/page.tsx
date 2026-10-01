@@ -38,8 +38,10 @@ function AnalysisContent() {
   const [stats, setStats] = useState({
     totalGames: 0,
     analyzedGames: 0,
+    analyzedThisMonth: 0,
     isPremium: false,
-    retentionLimit: 100 as number | null
+    monthlyLimit: null as number | null,
+    limitResetsAt: "",
   });
   const [analyzing, setAnalyzing] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -91,10 +93,12 @@ function AnalysisContent() {
       setStats({
         totalGames: data.totalGames || 0,
         analyzedGames: data.analyzedGames || 0,
+        analyzedThisMonth: data.analyzedThisMonth || 0,
         isPremium: data.isPremium || false,
-        retentionLimit: data.retentionLimit,
+        monthlyLimit: data.monthlyLimit,
+        limitResetsAt: data.limitResetsAt || "",
       });
-      if (!data.isPremium && data.retentionLimit && data.analyzedGames >= data.retentionLimit) {
+      if (!data.isPremium && data.monthlyLimit && data.analyzedThisMonth >= data.monthlyLimit) {
         setRetentionLimitReached(true);
       } else {
         setRetentionLimitReached(false);
@@ -131,7 +135,7 @@ function AnalysisContent() {
 
       if (data.limitReached) {
         setRetentionLimitReached(true);
-        toast.error("Free analysis limit reached");
+        toast.error("Monthly analysis limit reached");
         setAnalyzing(false);
         return;
       }
@@ -205,7 +209,7 @@ function AnalysisContent() {
             failed++;
             if (result.limitReached) {
               setRetentionLimitReached(true);
-              toast.error("Free analysis limit reached");
+              toast.error("Monthly analysis limit reached");
               abortRef.current = true;
             }
           }
@@ -245,6 +249,12 @@ function AnalysisContent() {
     setStopping(true);
     toast.info("Stopping analysis...");
   };
+
+  // Free monthly limit display. During a run, add the games analyzed so far this run.
+  const usedThisMonth = stats.analyzedThisMonth + (analyzing ? Math.max(0, analyzeProgress.current - stats.analyzedGames) : 0);
+  const resetDate = stats.limitResetsAt ? new Date(stats.limitResetsAt) : null;
+  const resetLabel = resetDate ? resetDate.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" }) : "next month";
+  const monthName = new Date().toLocaleDateString(undefined, { month: "long", timeZone: "UTC" });
 
   if (authLoading || loading) {
     return <LoadingSpinner />;
@@ -412,10 +422,10 @@ function AnalysisContent() {
       {retentionLimitReached && !stats.isPremium && (
         <div className="bg-[#f44336]/10 border border-[#f44336]/30 rounded-lg p-5 mb-8">
           <p className="text-[#f5f5f5] font-medium mb-2">
-            You&apos;ve analyzed {stats.analyzedGames} games (free limit: {stats.retentionLimit})
+            You&apos;ve used all {stats.monthlyLimit} free analyses for {monthName}. More unlock {resetLabel}.
           </p>
           <p className="text-[#b4b4b4] text-sm mb-4">
-            To analyze more games and grow your blunder library:
+            Don&apos;t want to wait? Premium has no monthly limit:
           </p>
           <a
             href="/account"
@@ -424,8 +434,7 @@ function AnalysisContent() {
             Upgrade to Premium - $4.99/mo
           </a>
           <ul className="mt-4 space-y-1 text-sm text-[#b4b4b4]">
-            <li>- Analyze up to 1,000 games at a time</li>
-            <li>- Unlimited game retention</li>
+            <li>- Unlimited analyses every month</li>
             <li>- Higher analysis depth (up to 25)</li>
           </ul>
         </div>
@@ -439,11 +448,11 @@ function AnalysisContent() {
           sublabel={`${(analyzing ? analyzeProgress.total : stats.totalGames) > 0 ? Math.round(((analyzing ? analyzeProgress.current : stats.analyzedGames) / (analyzing ? analyzeProgress.total : stats.totalGames)) * 100) : 0}%`}
           valueColor="text-[#18be5d]"
         />
-        {!stats.isPremium && stats.retentionLimit && (
+        {!stats.isPremium && stats.monthlyLimit && (
           <StatCard
-            label="Analysis Limit"
-            value={`${analyzing ? analyzeProgress.current : stats.analyzedGames}/${stats.retentionLimit}`}
-            sublabel={retentionLimitReached ? "Limit reached" : `${stats.retentionLimit - (analyzing ? analyzeProgress.current : stats.analyzedGames)} remaining`}
+            label="This Month"
+            value={`${usedThisMonth}/${stats.monthlyLimit}`}
+            sublabel={retentionLimitReached ? `Resets ${resetLabel}` : `${Math.max(0, stats.monthlyLimit - usedThisMonth)} left · resets ${resetLabel}`}
             valueColor={retentionLimitReached ? "text-[#f44336]" : "text-[#ff6f00]"}
           />
         )}

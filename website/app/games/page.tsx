@@ -16,7 +16,6 @@ export default function GamesPage() {
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [importCount, setImportCount] = useState("50");
-  const [isPremium, setIsPremium] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -27,26 +26,8 @@ export default function GamesPage() {
   useEffect(() => {
     if (user) {
       fetchGames();
-      fetchPremiumStatus();
     }
   }, [user]);
-
-  const fetchPremiumStatus = async () => {
-    try {
-      const response = await fetch("/api/user");
-      const data = await response.json();
-      if (data.user) {
-        const status = data.user.stripe_subscription_status;
-        const periodEnd = data.user.subscription_period_end;
-        setIsPremium(
-          status === "active" ||
-          status === "trialing" ||
-          (status === "canceled" && periodEnd && new Date(periodEnd) > new Date())
-        );
-      }
-    } catch (error) {
-    }
-  };
 
   const fetchGames = async () => {
     try {
@@ -70,11 +51,7 @@ export default function GamesPage() {
 
       const data = await response.json();
       if (response.ok) {
-        let message = `Imported ${data.imported} new games out of ${data.total} fetched`;
-        if (data.limited) {
-          message += ` (limited to ${data.maxFreeGames} for free accounts)`;
-        }
-        toast.success(message);
+        toast.success(`Imported ${data.imported.toLocaleString()} new games out of ${data.total.toLocaleString()} fetched`);
         fetchGames();
       } else if (data.upgrade) {
         toast.error(
@@ -113,15 +90,10 @@ export default function GamesPage() {
             <option value="25" className="bg-[#2a2a2a] text-[#f5f5f5]">Last 25 games</option>
             <option value="50" className="bg-[#2a2a2a] text-[#f5f5f5]">Last 50 games</option>
             <option value="100" className="bg-[#2a2a2a] text-[#f5f5f5]">Last 100 games</option>
-            <option value="250" disabled={!isPremium} className={`bg-[#2a2a2a] ${isPremium ? "text-[#f5f5f5]" : "text-[#707070]"}`}>
-              Last 250 games {!isPremium && "(Premium)"}
-            </option>
-            <option value="500" disabled={!isPremium} className={`bg-[#2a2a2a] ${isPremium ? "text-[#f5f5f5]" : "text-[#707070]"}`}>
-              Last 500 games {!isPremium && "(Premium)"}
-            </option>
-            <option value="1000" disabled={!isPremium} className={`bg-[#2a2a2a] ${isPremium ? "text-[#f5f5f5]" : "text-[#707070]"}`}>
-              Last 1000 games {!isPremium && "(Premium)"}
-            </option>
+            <option value="250" className="bg-[#2a2a2a] text-[#f5f5f5]">Last 250 games</option>
+            <option value="500" className="bg-[#2a2a2a] text-[#f5f5f5]">Last 500 games</option>
+            <option value="1000" className="bg-[#2a2a2a] text-[#f5f5f5]">Last 1000 games</option>
+            <option value="all" className="bg-[#2a2a2a] text-[#f5f5f5]">All games</option>
           </select>
           <button
             onClick={importGames}
@@ -138,6 +110,9 @@ export default function GamesPage() {
             )}
           </button>
         </div>
+        {importing && importCount === "all" && (
+          <p className="text-sm text-[#b4b4b4]">This can take a minute if you have years of games.</p>
+        )}
         {games.length > 0 && (
           <Link
             href="/analysis"

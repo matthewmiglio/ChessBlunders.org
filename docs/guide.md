@@ -58,7 +58,7 @@ Client-side analyzer used by the /analysis page:
 - Games are analyzed sequentially through one engine instance; the UI shows progress and supports stop/resume
 
 ### Persistence
-- The browser cannot write to the database directly. Computed blunders are sent to `POST /api/analysis/save`, which authenticates the user, verifies game ownership, deduplicates, enforces the free-tier limit (100 analyses), and inserts into the Supabase `analysis` table.
+- The browser cannot write to the database directly. Computed blunders are sent to `POST /api/analysis/save`, which authenticates the user, verifies game ownership, deduplicates, enforces the free-tier limit (200 analyses per calendar month, also enforced by a database trigger), and inserts into the Supabase `analysis` table.
 - Games, analyses, practice progress, and subscriptions live in Supabase (Postgres) behind Next.js API routes.
 
 ### Testing (`testing/`)
