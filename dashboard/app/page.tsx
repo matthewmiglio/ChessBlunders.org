@@ -18,6 +18,7 @@ import { SolveAttemptsDistribution } from "@/components/SolveAttemptsDistributio
 import { EngineUsageOverTime } from "@/components/EngineUsageOverTime";
 import { UserActivityPieChart } from "@/components/UserActivityPieChart";
 import { CumulativeUsersChart } from "@/components/CumulativeUsersChart";
+import { MarketingEmailReturns } from "@/components/MarketingEmailReturns";
 
 interface Summary {
   total_views: number;
@@ -181,6 +182,12 @@ export default function Dashboard() {
             Usage Statistics
           </h2>
           <UsageStatsCards />
+        </section>
+
+        {/* Marketing Emails */}
+        <section id="marketing" className="mb-8 scroll-mt-16">
+          <h2 className="text-sm font-bold uppercase tracking-[0.15em] text-gray-900 mb-4">Marketing Emails</h2>
+          <MarketingEmailReturns />
         </section>
 
         {/* Usage Over Time Charts */}
